@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browser Hang Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Browser Hang Demo</h1>
+    <p>Click the button below to start an infinite loop that will cause the browser to hang:</p>
+    
+    <button onclick="startHang()">Start Hang</button>
+    
+    <div id="counter">0</div>
+
+    <script>
+        let counter = 0;
+
+        function startHang() {
+            // This will cause the browser to hang
+            while (true) {
+                counter++;
+                document.getElementById('counter').textContent = counter;
+                // No setTimeout or other async operations to allow the event loop to breathe
+            }
+        }
+    </script>
+</body>
+</html> 
