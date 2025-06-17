@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Beforeunload Test</title>
+</head>
+<body>
+
+<h1>Beforeunload Event Test Page</h1>
+<p>Try to leave this page, and you should see a confirmation message.</p>
+<a href="https://www.google.com">Click here to navigate away</a>
+<p>You can also try reloading the page or closing the tab.</p>
+
+<textarea placeholder="Type something here to have unsaved changes..."></textarea>
+
+<script>
+    window.addEventListener('beforeunload', function (e) {
+        // Modern browsers require the event's preventDefault() to be called.
+        e.preventDefault();
+        
+        // Chrome and some other browsers require the returnValue property to be set.
+        // The string value does not matter and will not be displayed to the user.
+        // An empty string is sufficient.
+        e.returnValue = '';
+    });
+</script>
+
+</body>
+</html>
