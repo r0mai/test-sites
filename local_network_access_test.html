@@ -80,6 +80,16 @@
         Opening as a file:// URL won't test LNA properly.
     </div>
 
+    <div class="info-box" style="background: #fff3cd; border-left-color: #ffc107;">
+        <strong>🚀 Quick Setup:</strong>
+        <ol style="margin: 10px 0; padding-left: 20px;">
+            <li>Start the test server: <code>python local_network_test_server.py</code> (port 8888)</li>
+            <li>Serve this page: <code>python -m http.server 8080</code> (different port!)</li>
+            <li>Open <code>http://localhost:8080/local_network_access_test.html</code></li>
+            <li>Click "Run All Tests" - the ★ Test Server endpoints will show definitive results</li>
+        </ol>
+    </div>
+
     <div class="test-card" id="permissionStatus">
         <h3>📋 Permission API Status</h3>
         <div id="permissionResult">Checking...</div>
@@ -104,9 +114,14 @@
 
     <script>
         const testEndpoints = [
+            // Test server endpoint (run local_network_test_server.py first!)
+            { url: 'http://127.0.0.1:8888/test', name: '★ Test Server (127.0.0.1:8888)', type: 'loopback', cors: true },
+            { url: 'http://localhost:8888/test', name: '★ Test Server (localhost:8888)', type: 'loopback', cors: true },
+            // Standard loopback tests
             { url: 'http://127.0.0.1/', name: 'Loopback (127.0.0.1)', type: 'loopback' },
             { url: 'http://localhost/', name: 'Localhost', type: 'loopback' },
             { url: 'http://[::1]/', name: 'IPv6 Loopback (::1)', type: 'loopback' },
+            // Private network tests
             { url: 'http://192.168.1.1/', name: 'Common Router (192.168.1.1)', type: 'private' },
             { url: 'http://192.168.0.1/', name: 'Common Router (192.168.0.1)', type: 'private' },
             { url: 'http://10.0.0.1/', name: 'Private Network (10.0.0.1)', type: 'private' },
@@ -121,20 +136,33 @@
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 3000);
                 
+                // Use 'cors' mode for endpoints that support it, otherwise 'no-cors'
                 const response = await fetch(endpoint.url, {
                     method: 'GET',
-                    mode: 'no-cors', // Most local servers won't have CORS headers
+                    mode: endpoint.cors ? 'cors' : 'no-cors',
                     signal: controller.signal
                 });
                 
                 clearTimeout(timeoutId);
                 const elapsed = (performance.now() - startTime).toFixed(0);
                 
+                // For CORS-enabled endpoints, we can read the response
+                let responseData = null;
+                if (endpoint.cors && response.ok) {
+                    try {
+                        responseData = await response.json();
+                    } catch (e) {
+                        // Ignore JSON parse errors
+                    }
+                }
+                
                 return {
                     ...endpoint,
                     status: 'allowed',
-                    message: `Request completed (${elapsed}ms) - LNA likely ALLOWED or disabled`,
-                    responseType: response.type
+                    message: `Request completed (${elapsed}ms) - LNA is ALLOWED`,
+                    responseType: response.type,
+                    responseStatus: response.status,
+                    responseData: responseData
                 };
             } catch (error) {
                 const elapsed = (performance.now() - startTime).toFixed(0);
@@ -185,6 +213,8 @@
                     <br>${result.message}
                     ${result.error ? `<br><span class="error-msg">Error: ${result.error}</span>` : ''}
                     ${result.responseType ? `<br>Response type: ${result.responseType}` : ''}
+                    ${result.responseStatus ? `<br>HTTP Status: ${result.responseStatus}` : ''}
+                    ${result.responseData ? `<br>Server response: <code>${JSON.stringify(result.responseData.message || result.responseData)}</code>` : ''}
                 </div>
             `;
             
