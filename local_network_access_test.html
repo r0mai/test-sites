@@ -80,12 +80,18 @@
         Opening as a file:// URL won't test LNA properly.
     </div>
 
+    <div class="test-card" id="permissionStatus">
+        <h3>📋 Permission API Status</h3>
+        <div id="permissionResult">Checking...</div>
+    </div>
+
     <div class="results-summary" id="summary">
         Click "Run All Tests" to check Local Network Access status
     </div>
 
     <button onclick="runAllTests()">Run All Tests</button>
     <button onclick="clearResults()">Clear Results</button>
+    <button onclick="checkPermissionAPI()">Query Permission API</button>
 
     <div id="results"></div>
 
@@ -251,6 +257,66 @@
             document.getElementById('summary').innerHTML = 'Click "Run All Tests" to check Local Network Access status';
             testResults = [];
         }
+
+        // Query the Permission API directly
+        async function checkPermissionAPI() {
+            const resultDiv = document.getElementById('permissionResult');
+            
+            try {
+                const permission = await navigator.permissions.query({ 
+                    name: "local-network-access" 
+                });
+                
+                const stateColors = {
+                    'granted': '#155724',
+                    'denied': '#721c24', 
+                    'prompt': '#856404'
+                };
+                const stateIcons = {
+                    'granted': '✓',
+                    'denied': '✗',
+                    'prompt': '?'
+                };
+                
+                resultDiv.innerHTML = `
+                    <strong style="color: ${stateColors[permission.state]}">
+                        ${stateIcons[permission.state]} Permission state: ${permission.state.toUpperCase()}
+                    </strong>
+                    <div class="details">
+                        <code>navigator.permissions.query({ name: "local-network-access" })</code>
+                        <br><br>
+                        <strong>What this means:</strong><br>
+                        • <strong>granted</strong> - User allowed local network access for this site<br>
+                        • <strong>denied</strong> - User blocked local network access for this site<br>
+                        • <strong>prompt</strong> - User will be prompted when a request is made
+                    </div>
+                `;
+
+                // Listen for changes
+                permission.addEventListener('change', () => {
+                    checkPermissionAPI(); // Refresh display
+                    console.log('Permission state changed to:', permission.state);
+                });
+                
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <strong style="color: #721c24">✗ Error querying permission</strong>
+                    <div class="details">
+                        <span class="error-msg">${error.toString()}</span>
+                        <br><br>
+                        This could mean:
+                        <ul>
+                            <li>The browser doesn't support querying this permission</li>
+                            <li>The page is not in a secure context (needs HTTPS or localhost)</li>
+                            <li>Local Network Access feature is disabled</li>
+                        </ul>
+                    </div>
+                `;
+            }
+        }
+
+        // Check permission on page load
+        checkPermissionAPI();
     </script>
 </body>
 </html>
