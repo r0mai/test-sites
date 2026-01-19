@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local Network Access Permission Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #333; }
+        .test-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status.pending { background: #ffeeba; color: #856404; }
+        .status.allowed { background: #d4edda; color: #155724; }
+        .status.blocked { background: #f8d7da; color: #721c24; }
+        .status.error { background: #fff3cd; color: #856404; }
+        .endpoint { font-family: monospace; background: #e9ecef; padding: 2px 6px; border-radius: 3px; }
+        .details { margin-top: 10px; font-size: 0.9em; color: #666; }
+        .error-msg { color: #dc3545; font-family: monospace; font-size: 0.85em; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .custom-test { margin-top: 20px; }
+        .custom-test input {
+            padding: 10px;
+            font-size: 14px;
+            width: 300px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .results-summary {
+            background: #333;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔒 Local Network Access Permission Test</h1>
+    
+    <div class="info-box">
+        <strong>How this works:</strong> This page attempts to make fetch requests to local network addresses.
+        If Local Network Access checks are enabled and you haven't granted permission, these requests will be blocked.
+        <br><br>
+        <strong>Note:</strong> This page must be served from a public origin (or localhost with different port) to trigger LNA checks.
+        Opening as a file:// URL won't test LNA properly.
+    </div>
+
+    <div class="results-summary" id="summary">
+        Click "Run All Tests" to check Local Network Access status
+    </div>
+
+    <button onclick="runAllTests()">Run All Tests</button>
+    <button onclick="clearResults()">Clear Results</button>
+
+    <div id="results"></div>
+
+    <div class="custom-test test-card">
+        <h3>Custom Endpoint Test</h3>
+        <input type="text" id="customUrl" placeholder="http://192.168.1.1:80" value="http://192.168.1.1">
+        <button onclick="testCustom()">Test Custom URL</button>
+        <div id="customResult"></div>
+    </div>
+
+    <script>
+        const testEndpoints = [
+            { url: 'http://127.0.0.1/', name: 'Loopback (127.0.0.1)', type: 'loopback' },
+            { url: 'http://localhost/', name: 'Localhost', type: 'loopback' },
+            { url: 'http://[::1]/', name: 'IPv6 Loopback (::1)', type: 'loopback' },
+            { url: 'http://192.168.1.1/', name: 'Common Router (192.168.1.1)', type: 'private' },
+            { url: 'http://192.168.0.1/', name: 'Common Router (192.168.0.1)', type: 'private' },
+            { url: 'http://10.0.0.1/', name: 'Private Network (10.0.0.1)', type: 'private' },
+            { url: 'http://172.16.0.1/', name: 'Private Network (172.16.0.1)', type: 'private' },
+        ];
+
+        let testResults = [];
+
+        async function testEndpoint(endpoint) {
+            const startTime = performance.now();
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
+                
+                const response = await fetch(endpoint.url, {
+                    method: 'GET',
+                    mode: 'no-cors', // Most local servers won't have CORS headers
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                const elapsed = (performance.now() - startTime).toFixed(0);
+                
+                return {
+                    ...endpoint,
+                    status: 'allowed',
+                    message: `Request completed (${elapsed}ms) - LNA likely ALLOWED or disabled`,
+                    responseType: response.type
+                };
+            } catch (error) {
+                const elapsed = (performance.now() - startTime).toFixed(0);
+                
+                // Check if it's an LNA block
+                const errorStr = error.toString();
+                const isLNABlock = errorStr.includes('Failed to fetch') || 
+                                   errorStr.includes('NetworkError') ||
+                                   errorStr.includes('blocked');
+                
+                if (error.name === 'AbortError') {
+                    return {
+                        ...endpoint,
+                        status: 'error',
+                        message: `Timeout after 3s - endpoint may not exist or is very slow`,
+                        error: 'Timeout'
+                    };
+                }
+                
+                return {
+                    ...endpoint,
+                    status: 'blocked',
+                    message: `Request failed (${elapsed}ms) - possibly blocked by LNA`,
+                    error: errorStr
+                };
+            }
+        }
+
+        function renderResult(result, containerId = 'results') {
+            const container = document.getElementById(containerId);
+            const div = document.createElement('div');
+            div.className = 'test-card';
+            
+            const statusClass = result.status;
+            const statusText = {
+                'allowed': '✓ ALLOWED',
+                'blocked': '✗ BLOCKED', 
+                'error': '? UNKNOWN',
+                'pending': '⏳ TESTING'
+            }[result.status];
+
+            div.innerHTML = `
+                <strong>${result.name}</strong>
+                <span class="status ${statusClass}">${statusText}</span>
+                <div class="details">
+                    Endpoint: <span class="endpoint">${result.url}</span>
+                    <br>Type: ${result.type}
+                    <br>${result.message}
+                    ${result.error ? `<br><span class="error-msg">Error: ${result.error}</span>` : ''}
+                    ${result.responseType ? `<br>Response type: ${result.responseType}` : ''}
+                </div>
+            `;
+            
+            if (containerId === 'results') {
+                container.appendChild(div);
+            } else {
+                container.innerHTML = '';
+                container.appendChild(div);
+            }
+        }
+
+        async function runAllTests() {
+            const container = document.getElementById('results');
+            container.innerHTML = '<div class="test-card"><em>Running tests...</em></div>';
+            testResults = [];
+
+            container.innerHTML = '';
+            
+            for (const endpoint of testEndpoints) {
+                const result = await testEndpoint(endpoint);
+                testResults.push(result);
+                renderResult(result);
+            }
+
+            updateSummary();
+        }
+
+        function updateSummary() {
+            const summary = document.getElementById('summary');
+            const allowed = testResults.filter(r => r.status === 'allowed').length;
+            const blocked = testResults.filter(r => r.status === 'blocked').length;
+            const errors = testResults.filter(r => r.status === 'error').length;
+
+            let verdict = '';
+            if (blocked > 0 && allowed === 0) {
+                verdict = '🔒 Local Network Access appears to be BLOCKED';
+            } else if (allowed > 0 && blocked === 0) {
+                verdict = '🔓 Local Network Access appears to be ALLOWED';
+            } else if (allowed > 0 && blocked > 0) {
+                verdict = '⚠️ Mixed results - some endpoints allowed, some blocked';
+            } else {
+                verdict = '❓ Could not determine LNA status';
+            }
+
+            summary.innerHTML = `
+                <strong>${verdict}</strong><br>
+                <small>Allowed: ${allowed} | Blocked: ${blocked} | Timeout/Error: ${errors}</small>
+            `;
+        }
+
+        async function testCustom() {
+            const url = document.getElementById('customUrl').value.trim();
+            if (!url) {
+                alert('Please enter a URL');
+                return;
+            }
+
+            const result = await testEndpoint({
+                url: url,
+                name: 'Custom Endpoint',
+                type: 'custom'
+            });
+            
+            renderResult(result, 'customResult');
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('customResult').innerHTML = '';
+            document.getElementById('summary').innerHTML = 'Click "Run All Tests" to check Local Network Access status';
+            testResults = [];
+        }
+    </script>
+</body>
+</html>
