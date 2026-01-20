@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; connect-src 'self';">
+    <title>Test 1: CSP connect-src blocks tracker</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .back { margin-bottom: 20px; }
+        .back a { color: #1a73e8; }
+        h1 { color: #333; margin-bottom: 10px; }
+        .description {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .csp-display {
+            background: #f5f5f5;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 13px;
+            overflow-x: auto;
+        }
+        #results {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .result-item {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .pending { background: #fff3cd; }
+        .success { background: #d4edda; }
+        .error { background: #f8d7da; }
+        .info { background: #d1ecf1; }
+        button {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+        button:hover { background: #1557b0; }
+        code {
+            background: #e8e8e8;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="back"><a href="index.html">← Back to Test Suite</a></div>
+    
+    <h1>Test 1: CSP connect-src Blocks Tracker</h1>
+    
+    <div class="description">
+        <strong>Scenario:</strong> The page has a strict CSP that only allows connections to 'self'.
+        We attempt to fetch a known tracker URL (segment.com).
+        <br><br>
+        <strong>Question:</strong> Does CSP block the request before our tracker blocker can intercept it?
+    </div>
+
+    <h3>Active CSP:</h3>
+    <div class="csp-display">connect-src 'self'</div>
+
+    <h3>Target URL:</h3>
+    <div class="csp-display">https://api.segment.io/v1/t</div>
+
+    <button onclick="runTest()">Run Test</button>
+
+    <div id="results">
+        <div class="result-item pending">Click "Run Test" to begin...</div>
+    </div>
+
+    <script>
+        // Listen for CSP violations
+        let cspViolationDetected = false;
+        let cspViolationDetails = null;
+        
+        document.addEventListener('securitypolicyviolation', (e) => {
+            cspViolationDetected = true;
+            cspViolationDetails = {
+                blockedURI: e.blockedURI,
+                violatedDirective: e.violatedDirective,
+                originalPolicy: e.originalPolicy
+            };
+            console.log('CSP Violation detected:', e);
+        });
+
+        async function runTest() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="result-item pending">Running test...</div>';
+            
+            // Reset
+            cspViolationDetected = false;
+            cspViolationDetails = null;
+            
+            const results = [];
+            const startTime = performance.now();
+            
+            try {
+                // Attempt the fetch
+                const response = await fetch('https://api.segment.io/v1/t', {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ test: true })
+                });
+                
+                const endTime = performance.now();
+                results.push({
+                    type: 'info',
+                    text: `Fetch completed in ${(endTime - startTime).toFixed(0)}ms`
+                });
+                results.push({
+                    type: 'success',
+                    text: `Response status: ${response.status} ${response.statusText}`
+                });
+                
+            } catch (error) {
+                const endTime = performance.now();
+                results.push({
+                    type: 'error',
+                    text: `Fetch threw error: ${error.name}: ${error.message}`
+                });
+                results.push({
+                    type: 'info',
+                    text: `Error occurred after ${(endTime - startTime).toFixed(0)}ms`
+                });
+            }
+            
+            // Small delay to allow CSP violation event to fire
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            if (cspViolationDetected) {
+                results.push({
+                    type: 'error',
+                    text: `CSP Violation detected!`
+                });
+                results.push({
+                    type: 'info',
+                    text: `Blocked URI: ${cspViolationDetails.blockedURI}`
+                });
+                results.push({
+                    type: 'info',
+                    text: `Violated directive: ${cspViolationDetails.violatedDirective}`
+                });
+            } else {
+                results.push({
+                    type: 'success',
+                    text: 'No CSP violation event fired'
+                });
+            }
+            
+            // Render results
+            resultsDiv.innerHTML = results.map(r => 
+                `<div class="result-item ${r.type}">${r.text}</div>`
+            ).join('');
+            
+            // Add interpretation
+            resultsDiv.innerHTML += `
+                <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
+                <h4>Interpretation:</h4>
+                <p>If you see a CSP violation, the browser blocked the request <strong>before</strong> 
+                the tracker blocker could intercept it via CDP Fetch.</p>
+                <p>Check the Network tab in DevTools to see how the blocked request appears.</p>
+            `;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Test 3: window.opener with blocked subresource</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .back { margin-bottom: 20px; }
+        .back a { color: #1a73e8; }
+        h1 { color: #333; margin-bottom: 10px; }
+        .description {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        #results {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .result-item {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .pending { background: #fff3cd; }
+        .success { background: #d4edda; }
+        .error { background: #f8d7da; }
+        .info { background: #d1ecf1; }
+        button {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px 5px 5px 0;
+        }
+        button:hover { background: #1557b0; }
+        code {
+            background: #e8e8e8;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="back"><a href="index.html">← Back to Test Suite</a></div>
+    
+    <h1>Test 3: window.opener with Blocked Subresource</h1>
+    
+    <div class="description">
+        <strong>Scenario:</strong> This page opens a popup window. The popup will attempt to load
+        a blocked tracker and then check if <code>window.opener</code> is still accessible.
+        <br><br>
+        <strong>Question:</strong> Does blocking a subresource via CDP Fetch affect the 
+        window.opener relationship between parent and child windows?
+    </div>
+
+    <button onclick="openPopup()">Open Popup (with opener)</button>
+    <button onclick="openPopupNoOpener()">Open Popup (noopener)</button>
+
+    <div id="results">
+        <div class="result-item pending">Click a button to open a popup window...</div>
+    </div>
+
+    <script>
+        let popupWindow = null;
+        
+        function openPopup() {
+            popupWindow = window.open('test3-popup.html', '_blank', 'width=600,height=500');
+            document.getElementById('results').innerHTML = 
+                '<div class="result-item info">Popup opened. Check the popup window for results.</div>' +
+                '<div class="result-item info">The popup will attempt to load a blocked tracker and report window.opener status.</div>';
+        }
+        
+        function openPopupNoOpener() {
+            popupWindow = window.open('test3-popup.html', '_blank', 'width=600,height=500,noopener');
+            document.getElementById('results').innerHTML = 
+                '<div class="result-item info">Popup opened with noopener flag.</div>' +
+                '<div class="result-item info">window.opener should be null in this case (baseline comparison).</div>';
+        }
+        
+        // Listen for messages from popup
+        window.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'popup-results') {
+                const resultsDiv = document.getElementById('results');
+                const data = event.data;
+                
+                let html = '<h4>Results from Popup:</h4>';
+                
+                if (data.openerAccessible) {
+                    html += '<div class="result-item success">window.opener is accessible</div>';
+                    html += `<div class="result-item info">Opener location: ${data.openerLocation}</div>`;
+                } else {
+                    html += '<div class="result-item error">window.opener is NOT accessible</div>';
+                    html += `<div class="result-item info">Reason: ${data.openerError || 'null or undefined'}</div>`;
+                }
+                
+                html += '<hr style="margin: 15px 0; border: none; border-top: 1px solid #ddd;">';
+                html += '<h4>Tracker Load Attempt:</h4>';
+                
+                if (data.trackerBlocked) {
+                    html += '<div class="result-item success">Tracker request was blocked (expected)</div>';
+                    html += `<div class="result-item info">Error: ${data.trackerError}</div>`;
+                } else {
+                    html += '<div class="result-item error">Tracker request succeeded (unexpected)</div>';
+                    html += `<div class="result-item info">Status: ${data.trackerStatus}</div>`;
+                }
+                
+                html += '<hr style="margin: 15px 0; border: none; border-top: 1px solid #ddd;">';
+                html += `<div class="result-item info">Opener check happened ${data.openerCheckTiming}</div>`;
+                
+                resultsDiv.innerHTML = html;
+            }
+        });
+    </script>
+</body>
+</html>

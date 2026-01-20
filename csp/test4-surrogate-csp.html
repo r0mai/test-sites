@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Strict CSP that only allows scripts from 'self' -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';">
+    <title>Test 4: Surrogate script with strict CSP</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .back { margin-bottom: 20px; }
+        .back a { color: #1a73e8; }
+        h1 { color: #333; margin-bottom: 10px; }
+        .description {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .csp-display {
+            background: #f5f5f5;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 13px;
+            overflow-x: auto;
+        }
+        #results {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .result-item {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .pending { background: #fff3cd; }
+        .success { background: #d4edda; }
+        .error { background: #f8d7da; }
+        .info { background: #d1ecf1; }
+        button {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+        button:hover { background: #1557b0; }
+    </style>
+</head>
+<body>
+    <div class="back"><a href="index.html">← Back to Test Suite</a></div>
+    
+    <h1>Test 4: Surrogate Script with Strict CSP</h1>
+    
+    <div class="description">
+        <strong>Scenario:</strong> This page has a strict CSP with <code>script-src 'self' 'unsafe-inline'</code>.
+        We attempt to load a script that should be replaced with a surrogate by the tracker blocker.
+        <br><br>
+        <strong>Question:</strong> When the tracker blocker returns a surrogate script via 
+        <code>Fetch.fulfillRequest</code>, does CSP evaluate and potentially block the synthetic response?
+    </div>
+
+    <div class="warning">
+        <strong>Note:</strong> This test requires knowledge of which tracker scripts have surrogates configured.
+        Common examples include Google Analytics (analytics.js) and Facebook Pixel (fbevents.js).
+        Results depend on which surrogates are configured in your tracker blocker.
+    </div>
+
+    <h3>Active CSP:</h3>
+    <div class="csp-display">script-src 'self' 'unsafe-inline'</div>
+
+    <h3>Target Scripts (known to have surrogates):</h3>
+    <ul>
+        <li><code>https://www.google-analytics.com/analytics.js</code></li>
+        <li><code>https://www.googletagmanager.com/gtag/js</code></li>
+    </ul>
+
+    <button onclick="runTest()">Run Test</button>
+
+    <div id="results">
+        <div class="result-item pending">Click "Run Test" to begin...</div>
+    </div>
+
+    <!-- Container for dynamically loaded scripts -->
+    <div id="script-container"></div>
+
+    <script>
+        // Track CSP violations
+        let cspViolations = [];
+        
+        document.addEventListener('securitypolicyviolation', (e) => {
+            cspViolations.push({
+                blockedURI: e.blockedURI,
+                violatedDirective: e.violatedDirective,
+                sourceFile: e.sourceFile,
+                lineNumber: e.lineNumber
+            });
+            console.log('CSP Violation:', e);
+        });
+        
+        // Track script load/error events
+        let scriptResults = [];
+        
+        function loadScript(url, name) {
+            return new Promise((resolve) => {
+                const script = document.createElement('script');
+                script.src = url;
+                script.async = true;
+                
+                const startTime = performance.now();
+                
+                script.onload = () => {
+                    const endTime = performance.now();
+                    resolve({
+                        name: name,
+                        url: url,
+                        loaded: true,
+                        error: null,
+                        time: (endTime - startTime).toFixed(0)
+                    });
+                };
+                
+                script.onerror = (error) => {
+                    const endTime = performance.now();
+                    resolve({
+                        name: name,
+                        url: url,
+                        loaded: false,
+                        error: 'Script load error (onerror fired)',
+                        time: (endTime - startTime).toFixed(0)
+                    });
+                };
+                
+                document.getElementById('script-container').appendChild(script);
+            });
+        }
+
+        async function runTest() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="result-item pending">Loading test scripts...</div>';
+            
+            // Reset
+            cspViolations = [];
+            scriptResults = [];
+            document.getElementById('script-container').innerHTML = '';
+            
+            const results = [];
+            
+            // Test scripts that might have surrogates
+            const testScripts = [
+                { url: 'https://www.google-analytics.com/analytics.js', name: 'Google Analytics' },
+                { url: 'https://www.googletagmanager.com/gtag/js?id=UA-TEST-1', name: 'Google Tag Manager' }
+            ];
+            
+            for (const testScript of testScripts) {
+                results.push({ type: 'info', text: `Loading: ${testScript.name}` });
+                const result = await loadScript(testScript.url, testScript.name);
+                scriptResults.push(result);
+                
+                if (result.loaded) {
+                    results.push({ 
+                        type: 'success', 
+                        text: `${result.name}: Loaded successfully (${result.time}ms)` 
+                    });
+                    results.push({ 
+                        type: 'info', 
+                        text: `This could mean: surrogate was served and CSP allowed it` 
+                    });
+                } else {
+                    results.push({ 
+                        type: 'error', 
+                        text: `${result.name}: Failed to load (${result.time}ms)` 
+                    });
+                    results.push({ 
+                        type: 'info', 
+                        text: `Error: ${result.error}` 
+                    });
+                }
+                
+                // Small delay between scripts
+                await new Promise(r => setTimeout(r, 200));
+            }
+            
+            // Wait for CSP violations to fire
+            await new Promise(r => setTimeout(r, 500));
+            
+            // Report CSP violations
+            results.push({ type: 'info', text: '--- CSP Violations ---' });
+            
+            if (cspViolations.length === 0) {
+                results.push({ 
+                    type: 'success', 
+                    text: 'No CSP violations detected' 
+                });
+            } else {
+                for (const violation of cspViolations) {
+                    results.push({ 
+                        type: 'error', 
+                        text: `CSP blocked: ${violation.blockedURI}` 
+                    });
+                    results.push({ 
+                        type: 'info', 
+                        text: `Directive: ${violation.violatedDirective}` 
+                    });
+                }
+            }
+            
+            // Check if any tracking globals exist (indicates surrogate might have loaded)
+            results.push({ type: 'info', text: '--- Global Objects Check ---' });
+            
+            const globalsToCheck = ['ga', 'gtag', 'dataLayer', 'GoogleAnalyticsObject'];
+            for (const globalName of globalsToCheck) {
+                if (typeof window[globalName] !== 'undefined') {
+                    results.push({ 
+                        type: 'info', 
+                        text: `window.${globalName} exists (type: ${typeof window[globalName]})` 
+                    });
+                }
+            }
+            
+            // Render results
+            resultsDiv.innerHTML = results.map(r => 
+                `<div class="result-item ${r.type}">${r.text}</div>`
+            ).join('');
+            
+            // Add interpretation
+            resultsDiv.innerHTML += `
+                <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
+                <h4>Interpretation:</h4>
+                <p>If the tracker blocker serves a surrogate script:</p>
+                <ul>
+                    <li><strong>Script loads + No CSP violation</strong> = Surrogate bypassed CSP check</li>
+                    <li><strong>Script fails + CSP violation</strong> = CSP blocked the surrogate</li>
+                    <li><strong>Script fails + No CSP violation</strong> = Script was blocked without surrogate</li>
+                </ul>
+                <p>Check the Network tab to see what was actually returned for each script request.</p>
+            `;
+        }
+    </script>
+</body>
+</html>
