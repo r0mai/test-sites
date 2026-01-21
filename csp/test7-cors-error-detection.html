@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Test 7: CORS Error Detection APIs</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .back { margin-bottom: 20px; }
+        .back a { color: #1a73e8; }
+        h1 { color: #333; margin-bottom: 10px; }
+        h2 { color: #555; margin-top: 30px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+        .description {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        #results {
+            margin-top: 20px;
+        }
+        .api-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .api-section h3 {
+            margin-top: 0;
+            color: #1a73e8;
+        }
+        .result-item {
+            padding: 8px 12px;
+            margin: 5px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .pending { background: #fff3cd; }
+        .success { background: #d4edda; }
+        .error { background: #f8d7da; }
+        .info { background: #d1ecf1; }
+        .neutral { background: #e9ecef; }
+        button {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px 5px 5px 0;
+        }
+        button:hover { background: #1557b0; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .code-block {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin: 10px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 13px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th { background: #f5f5f5; }
+        .highlight { background: #fffde7; }
+    </style>
+</head>
+<body>
+    <div class="back"><a href="index.html">← Back to Test Suite</a></div>
+    
+    <h1>Test 7: CORS Error Detection APIs</h1>
+    
+    <div class="description">
+        <strong>Purpose:</strong> Investigate all browser APIs that could be used to detect the type of error
+        when a request fails. Can JavaScript distinguish between a CORS error, a network error, a blocked request, etc.?
+        <br><br>
+        <strong>Target:</strong> <code>https://api.segment.io/v1/t</code> (known tracker, will be blocked)
+    </div>
+
+    <button onclick="runAllTests()">Run All Tests</button>
+    <button onclick="clearResults()">Clear Results</button>
+
+    <div id="results"></div>
+
+    <script>
+        const TARGET_URL = 'https://api.segment.io/v1/t';
+        const resultsContainer = document.getElementById('results');
+        
+        // Global collectors for async events
+        let reportingObserverReports = [];
+        let securityViolations = [];
+        let networkErrors = [];
+        
+        // Set up global event listeners
+        function setupGlobalListeners() {
+            // SecurityPolicyViolation events (CSP)
+            document.addEventListener('securitypolicyviolation', (e) => {
+                securityViolations.push({
+                    blockedURI: e.blockedURI,
+                    violatedDirective: e.violatedDirective,
+                    effectiveDirective: e.effectiveDirective,
+                    originalPolicy: e.originalPolicy,
+                    disposition: e.disposition,
+                    documentURI: e.documentURI,
+                    statusCode: e.statusCode
+                });
+            });
+            
+            // Reporting API (if available)
+            if (typeof ReportingObserver !== 'undefined') {
+                const observer = new ReportingObserver((reports, observer) => {
+                    reports.forEach(report => {
+                        reportingObserverReports.push({
+                            type: report.type,
+                            url: report.url,
+                            body: report.body
+                        });
+                    });
+                }, { buffered: true });
+                observer.observe();
+            }
+            
+            // Global error handler
+            window.addEventListener('error', (e) => {
+                networkErrors.push({
+                    message: e.message,
+                    filename: e.filename,
+                    lineno: e.lineno,
+                    colno: e.colno,
+                    error: e.error?.toString()
+                });
+            });
+            
+            // Unhandled rejection handler
+            window.addEventListener('unhandledrejection', (e) => {
+                networkErrors.push({
+                    type: 'unhandledrejection',
+                    reason: e.reason?.toString()
+                });
+            });
+        }
+        
+        setupGlobalListeners();
+        
+        function addSection(title, content) {
+            const section = document.createElement('div');
+            section.className = 'api-section';
+            section.innerHTML = `<h3>${title}</h3>${content}`;
+            resultsContainer.appendChild(section);
+        }
+        
+        function formatValue(value) {
+            if (value === undefined) return '<span class="neutral">undefined</span>';
+            if (value === null) return '<span class="neutral">null</span>';
+            if (value === '') return '<span class="neutral">(empty string)</span>';
+            if (typeof value === 'object') return `<pre>${JSON.stringify(value, null, 2)}</pre>`;
+            return String(value);
+        }
+        
+        async function runAllTests() {
+            resultsContainer.innerHTML = '<div class="result-item pending">Running tests...</div>';
+            
+            // Reset collectors
+            reportingObserverReports = [];
+            securityViolations = [];
+            networkErrors = [];
+            
+            // Wait a moment for setup
+            await new Promise(r => setTimeout(r, 100));
+            resultsContainer.innerHTML = '';
+            
+            // Test 1: Fetch API
+            await testFetchAPI();
+            
+            // Test 2: Fetch with different modes
+            await testFetchModes();
+            
+            // Test 3: XMLHttpRequest
+            await testXMLHttpRequest();
+            
+            // Test 4: Image element
+            await testImageElement();
+            
+            // Test 5: Script element
+            await testScriptElement();
+            
+            // Wait for async events
+            await new Promise(r => setTimeout(r, 500));
+            
+            // Test 6: Reporting APIs
+            testReportingAPIs();
+            
+            // Test 7: Performance API
+            testPerformanceAPI();
+            
+            // Summary
+            addSummary();
+        }
+        
+        async function testFetchAPI() {
+            const results = [];
+            
+            try {
+                const response = await fetch(TARGET_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ test: true })
+                });
+                
+                results.push(['response.ok', response.ok]);
+                results.push(['response.status', response.status]);
+                results.push(['response.statusText', response.statusText]);
+                results.push(['response.type', response.type]);
+                results.push(['response.url', response.url]);
+                results.push(['response.redirected', response.redirected]);
+                results.push(['response.headers (entries)', Array.from(response.headers.entries())]);
+                
+                // Try to read body
+                try {
+                    const text = await response.text();
+                    results.push(['response.text()', text.substring(0, 200)]);
+                } catch (bodyErr) {
+                    results.push(['response.text() error', bodyErr.toString()]);
+                }
+                
+            } catch (error) {
+                results.push(['Error thrown', 'YES']);
+                results.push(['error.name', error.name]);
+                results.push(['error.message', error.message]);
+                results.push(['error.toString()', error.toString()]);
+                results.push(['error instanceof TypeError', error instanceof TypeError]);
+                results.push(['error.cause', error.cause]);
+            }
+            
+            let html = '<table><tr><th>Property</th><th>Value</th></tr>';
+            results.forEach(([prop, val]) => {
+                const highlight = (prop.includes('type') || prop.includes('status') || prop.includes('Error')) ? ' class="highlight"' : '';
+                html += `<tr${highlight}><td>${prop}</td><td>${formatValue(val)}</td></tr>`;
+            });
+            html += '</table>';
+            
+            addSection('1. Fetch API (mode: cors)', html);
+        }
+        
+        async function testFetchModes() {
+            const modes = ['cors', 'no-cors', 'same-origin'];
+            let html = '<table><tr><th>Mode</th><th>Result</th><th>response.type</th><th>response.status</th></tr>';
+            
+            for (const mode of modes) {
+                try {
+                    const response = await fetch(TARGET_URL, {
+                        method: 'POST',
+                        mode: mode,
+                        body: JSON.stringify({ test: true })
+                    });
+                    html += `<tr><td>${mode}</td><td class="success">Success</td><td>${response.type}</td><td>${response.status}</td></tr>`;
+                } catch (error) {
+                    html += `<tr><td>${mode}</td><td class="error">${error.name}: ${error.message}</td><td>-</td><td>-</td></tr>`;
+                }
+            }
+            
+            html += '</table>';
+            html += `<p><strong>Note:</strong> "no-cors" mode returns an "opaque" response with status 0, hiding all details.</p>`;
+            
+            addSection('2. Fetch API - Different Modes', html);
+        }
+        
+        async function testXMLHttpRequest() {
+            return new Promise((resolve) => {
+                const results = [];
+                const xhr = new XMLHttpRequest();
+                
+                xhr.addEventListener('loadstart', () => results.push(['Event: loadstart', 'fired']));
+                xhr.addEventListener('progress', () => results.push(['Event: progress', 'fired']));
+                xhr.addEventListener('load', () => results.push(['Event: load', 'fired']));
+                xhr.addEventListener('loadend', () => results.push(['Event: loadend', 'fired']));
+                xhr.addEventListener('error', () => results.push(['Event: error', 'fired']));
+                xhr.addEventListener('abort', () => results.push(['Event: abort', 'fired']));
+                xhr.addEventListener('timeout', () => results.push(['Event: timeout', 'fired']));
+                
+                xhr.addEventListener('readystatechange', () => {
+                    results.push([`readyState changed to`, xhr.readyState]);
+                });
+                
+                xhr.addEventListener('loadend', () => {
+                    results.push(['xhr.status', xhr.status]);
+                    results.push(['xhr.statusText', xhr.statusText]);
+                    results.push(['xhr.responseType', xhr.responseType]);
+                    results.push(['xhr.response', xhr.response?.substring?.(0, 100) || xhr.response]);
+                    results.push(['xhr.responseText', (() => { try { return xhr.responseText?.substring(0, 100); } catch(e) { return e.toString(); } })()]);
+                    results.push(['xhr.responseURL', xhr.responseURL]);
+                    results.push(['xhr.getAllResponseHeaders()', xhr.getAllResponseHeaders()]);
+                    
+                    let html = '<table><tr><th>Property/Event</th><th>Value</th></tr>';
+                    results.forEach(([prop, val]) => {
+                        const highlight = (prop.includes('status') || prop.includes('error') || prop.includes('Event:')) ? ' class="highlight"' : '';
+                        html += `<tr${highlight}><td>${prop}</td><td>${formatValue(val)}</td></tr>`;
+                    });
+                    html += '</table>';
+                    
+                    addSection('3. XMLHttpRequest', html);
+                    resolve();
+                });
+                
+                xhr.open('POST', TARGET_URL);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.send(JSON.stringify({ test: true }));
+            });
+        }
+        
+        async function testImageElement() {
+            return new Promise((resolve) => {
+                const results = [];
+                const img = new Image();
+                
+                img.addEventListener('load', () => results.push(['Event: load', 'fired']));
+                img.addEventListener('error', (e) => {
+                    results.push(['Event: error', 'fired']);
+                    results.push(['error event.type', e.type]);
+                    results.push(['error event.message', e.message]);
+                });
+                
+                const timeout = setTimeout(() => {
+                    results.push(['Timeout', '3 seconds passed']);
+                    finish();
+                }, 3000);
+                
+                function finish() {
+                    clearTimeout(timeout);
+                    results.push(['img.complete', img.complete]);
+                    results.push(['img.naturalWidth', img.naturalWidth]);
+                    results.push(['img.naturalHeight', img.naturalHeight]);
+                    
+                    let html = '<table><tr><th>Property/Event</th><th>Value</th></tr>';
+                    results.forEach(([prop, val]) => {
+                        html += `<tr><td>${prop}</td><td>${formatValue(val)}</td></tr>`;
+                    });
+                    html += '</table>';
+                    html += '<p><strong>Note:</strong> Image requests to trackers test a different code path.</p>';
+                    
+                    addSection('4. Image Element', html);
+                    resolve();
+                }
+                
+                img.addEventListener('load', finish);
+                img.addEventListener('error', finish);
+                
+                // Use a known image tracker URL
+                img.src = 'https://www.facebook.com/tr?test=1&noscript=1&t=' + Date.now();
+            });
+        }
+        
+        async function testScriptElement() {
+            return new Promise((resolve) => {
+                const results = [];
+                const script = document.createElement('script');
+                
+                script.addEventListener('load', () => results.push(['Event: load', 'fired']));
+                script.addEventListener('error', (e) => {
+                    results.push(['Event: error', 'fired']);
+                    results.push(['error event.type', e.type]);
+                });
+                
+                const timeout = setTimeout(() => {
+                    results.push(['Timeout', '3 seconds passed']);
+                    finish();
+                }, 3000);
+                
+                function finish() {
+                    clearTimeout(timeout);
+                    
+                    let html = '<table><tr><th>Property/Event</th><th>Value</th></tr>';
+                    results.forEach(([prop, val]) => {
+                        html += `<tr><td>${prop}</td><td>${formatValue(val)}</td></tr>`;
+                    });
+                    html += '</table>';
+                    html += '<p><strong>Note:</strong> Script element errors are intentionally vague for security.</p>';
+                    
+                    addSection('5. Script Element', html);
+                    resolve();
+                }
+                
+                script.addEventListener('load', finish);
+                script.addEventListener('error', finish);
+                
+                script.src = 'https://www.google-analytics.com/analytics.js?t=' + Date.now();
+                document.body.appendChild(script);
+            });
+        }
+        
+        function testReportingAPIs() {
+            let html = '<h4>SecurityPolicyViolation Events (CSP)</h4>';
+            if (securityViolations.length > 0) {
+                html += '<div class="code-block">' + JSON.stringify(securityViolations, null, 2) + '</div>';
+            } else {
+                html += '<div class="result-item neutral">No CSP violations detected</div>';
+            }
+            
+            html += '<h4>ReportingObserver Reports</h4>';
+            if (typeof ReportingObserver === 'undefined') {
+                html += '<div class="result-item neutral">ReportingObserver API not available</div>';
+            } else if (reportingObserverReports.length > 0) {
+                html += '<div class="code-block">' + JSON.stringify(reportingObserverReports, null, 2) + '</div>';
+            } else {
+                html += '<div class="result-item neutral">No reports captured</div>';
+            }
+            
+            html += '<h4>Global Error Events</h4>';
+            if (networkErrors.length > 0) {
+                html += '<div class="code-block">' + JSON.stringify(networkErrors, null, 2) + '</div>';
+            } else {
+                html += '<div class="result-item neutral">No global errors captured</div>';
+            }
+            
+            html += '<h4>Network Error Logging (NEL) Header</h4>';
+            html += '<div class="result-item neutral">NEL requires server-side header configuration - cannot test client-side only</div>';
+            
+            addSection('6. Reporting APIs', html);
+        }
+        
+        function testPerformanceAPI() {
+            let html = '<h4>Performance Resource Timing</h4>';
+            
+            const entries = performance.getEntriesByType('resource')
+                .filter(e => e.name.includes('segment') || e.name.includes('facebook') || e.name.includes('google-analytics'))
+                .slice(-5);
+            
+            if (entries.length > 0) {
+                html += '<table><tr><th>Property</th><th>Value</th></tr>';
+                entries.forEach(entry => {
+                    html += `<tr class="highlight"><td colspan="2"><strong>${entry.name}</strong></td></tr>`;
+                    html += `<tr><td>initiatorType</td><td>${entry.initiatorType}</td></tr>`;
+                    html += `<tr><td>duration</td><td>${entry.duration.toFixed(2)}ms</td></tr>`;
+                    html += `<tr><td>transferSize</td><td>${entry.transferSize}</td></tr>`;
+                    html += `<tr><td>encodedBodySize</td><td>${entry.encodedBodySize}</td></tr>`;
+                    html += `<tr><td>responseStatus</td><td>${entry.responseStatus ?? 'N/A'}</td></tr>`;
+                    html += `<tr><td>serverTiming</td><td>${JSON.stringify(entry.serverTiming)}</td></tr>`;
+                });
+                html += '</table>';
+            } else {
+                html += '<div class="result-item neutral">No matching resource timing entries found</div>';
+            }
+            
+            html += '<p><strong>Note:</strong> Cross-origin resources may have restricted timing info (Timing-Allow-Origin header required).</p>';
+            
+            addSection('7. Performance API', html);
+        }
+        
+        function addSummary() {
+            let html = `
+                <h4>Can JavaScript Detect the Error Type?</h4>
+                <table>
+                    <tr><th>Detection Method</th><th>Can Detect CORS Error?</th><th>Notes</th></tr>
+                    <tr>
+                        <td>fetch() error.name</td>
+                        <td class="highlight">Partial</td>
+                        <td>Returns "TypeError" for both CORS and network errors</td>
+                    </tr>
+                    <tr>
+                        <td>fetch() error.message</td>
+                        <td class="highlight">Browser-dependent</td>
+                        <td>Some browsers include "CORS" in message, others don't</td>
+                    </tr>
+                    <tr>
+                        <td>fetch() response.type</td>
+                        <td>No</td>
+                        <td>Only available if request succeeds; "opaque" in no-cors mode</td>
+                    </tr>
+                    <tr>
+                        <td>XMLHttpRequest status</td>
+                        <td>No</td>
+                        <td>Returns 0 for both CORS and network errors</td>
+                    </tr>
+                    <tr>
+                        <td>XMLHttpRequest error event</td>
+                        <td>No</td>
+                        <td>Fires for any error, no details exposed</td>
+                    </tr>
+                    <tr>
+                        <td>SecurityPolicyViolation</td>
+                        <td>CSP only</td>
+                        <td>Only fires for CSP violations, not CORS</td>
+                    </tr>
+                    <tr>
+                        <td>Performance API</td>
+                        <td>Limited</td>
+                        <td>transferSize=0 might indicate blocked, but not definitive</td>
+                    </tr>
+                </table>
+                
+                <h4>Key Findings</h4>
+                <ul>
+                    <li><strong>CORS errors are intentionally opaque</strong> - browsers hide details to prevent information leakage</li>
+                    <li><strong>TypeError is generic</strong> - same error type for CORS, network failure, DNS failure</li>
+                    <li><strong>no-cors mode</strong> returns opaque responses with status 0, hiding everything</li>
+                    <li><strong>The only clue</strong> might be the error message text (browser-specific)</li>
+                </ul>
+            `;
+            
+            addSection('Summary: Error Detection Capabilities', html);
+        }
+        
+        function clearResults() {
+            resultsContainer.innerHTML = '<div class="result-item pending">Click "Run All Tests" to begin...</div>';
+            reportingObserverReports = [];
+            securityViolations = [];
+            networkErrors = [];
+        }
+    </script>
+</body>
+</html>
