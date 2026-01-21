@@ -467,60 +467,6 @@
             addSection('7. Performance API', html);
         }
         
-        function addSummary() {
-            let html = `
-                <h4>Can JavaScript Detect the Error Type?</h4>
-                <table>
-                    <tr><th>Detection Method</th><th>Can Detect CORS Error?</th><th>Notes</th></tr>
-                    <tr>
-                        <td>fetch() error.name</td>
-                        <td class="highlight">Partial</td>
-                        <td>Returns "TypeError" for both CORS and network errors</td>
-                    </tr>
-                    <tr>
-                        <td>fetch() error.message</td>
-                        <td class="highlight">Browser-dependent</td>
-                        <td>Some browsers include "CORS" in message, others don't</td>
-                    </tr>
-                    <tr>
-                        <td>fetch() response.type</td>
-                        <td>No</td>
-                        <td>Only available if request succeeds; "opaque" in no-cors mode</td>
-                    </tr>
-                    <tr>
-                        <td>XMLHttpRequest status</td>
-                        <td>No</td>
-                        <td>Returns 0 for both CORS and network errors</td>
-                    </tr>
-                    <tr>
-                        <td>XMLHttpRequest error event</td>
-                        <td>No</td>
-                        <td>Fires for any error, no details exposed</td>
-                    </tr>
-                    <tr>
-                        <td>SecurityPolicyViolation</td>
-                        <td>CSP only</td>
-                        <td>Only fires for CSP violations, not CORS</td>
-                    </tr>
-                    <tr>
-                        <td>Performance API</td>
-                        <td>Limited</td>
-                        <td>transferSize=0 might indicate blocked, but not definitive</td>
-                    </tr>
-                </table>
-                
-                <h4>Key Findings</h4>
-                <ul>
-                    <li><strong>CORS errors are intentionally opaque</strong> - browsers hide details to prevent information leakage</li>
-                    <li><strong>TypeError is generic</strong> - same error type for CORS, network failure, DNS failure</li>
-                    <li><strong>no-cors mode</strong> returns opaque responses with status 0, hiding everything</li>
-                    <li><strong>The only clue</strong> might be the error message text (browser-specific)</li>
-                </ul>
-            `;
-            
-            addSection('Summary: Error Detection Capabilities', html);
-        }
-        
         function clearResults() {
             resultsContainer.innerHTML = '<div class="result-item pending">Click "Run All Tests" to begin...</div>';
             reportingObserverReports = [];
