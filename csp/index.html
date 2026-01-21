@@ -86,6 +86,11 @@
             <p>No CSP header. Attempts fetch to segment.com.</p>
             <p><strong>Expected:</strong> Tracker blocker returns 403, clean baseline behavior.</p>
         </li>
+        <li>
+            <a href="test6-form-post-opener.html">Test 6: Form POST with target="_blank" and window.opener</a>
+            <p>Form submits POST to tracker URL with <code>target="_blank"</code>. Tests navigation-level blocking.</p>
+            <p><strong>Expected:</strong> Investigate if window.opener survives when form POST navigation is blocked.</p>
+        </li>
     </ul>
 
     <h2>How to Use</h2>

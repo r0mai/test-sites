@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Test 6: Form POST with target="_blank" and window.opener</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .back { margin-bottom: 20px; }
+        .back a { color: #1a73e8; }
+        h1 { color: #333; margin-bottom: 10px; }
+        .description {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .test-section {
+            margin: 25px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #1a73e8;
+        }
+        #results {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .result-item {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .pending { background: #fff3cd; }
+        .success { background: #d4edda; }
+        .error { background: #f8d7da; }
+        .info { background: #d1ecf1; }
+        button, input[type="submit"] {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px 5px 5px 0;
+        }
+        button:hover, input[type="submit"]:hover { background: #1557b0; }
+        code {
+            background: #e8e8e8;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 13px;
+        }
+        .form-display {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="back"><a href="index.html">← Back to Test Suite</a></div>
+    
+    <h1>Test 6: Form POST with target="_blank" and window.opener</h1>
+    
+    <div class="description">
+        <strong>Scenario:</strong> A form submits via POST to a tracker URL with <code>target="_blank"</code>.
+        This opens a new window/tab that should have <code>window.opener</code> pointing back to this page.
+        <br><br>
+        <strong>Question:</strong> When tracker blocking intercepts a form POST navigation to a new window,
+        does it affect the <code>window.opener</code> relationship? Does the new window even open?
+    </div>
+
+    <div class="warning">
+        <strong>Note:</strong> This tests a navigation-level POST (form submission), not a fetch/XHR POST.
+        The browser may handle this differently than subresource requests.
+    </div>
+
+    <!-- Test 1: Form POST to tracker domain -->
+    <div class="test-section">
+        <h3>Test A: Form POST to Tracker Domain (segment.io)</h3>
+        <p>Submits form data to a known tracker. The tracker blocker should intercept this.</p>
+        
+        <div class="form-display">&lt;form action="https://api.segment.io/v1/t" method="POST" target="_blank"&gt;</div>
+        
+        <form id="trackerForm" action="https://api.segment.io/v1/t" method="POST" target="_blank">
+            <input type="hidden" name="test" value="true">
+            <input type="hidden" name="timestamp" id="timestampA">
+            <input type="hidden" name="source" value="csp-test-form">
+            <input type="submit" value="Submit to Tracker (new window)">
+        </form>
+    </div>
+
+    <!-- Test 2: Form POST to non-tracker domain for comparison -->
+    <div class="test-section">
+        <h3>Test B: Form POST to Non-Tracker Domain (baseline)</h3>
+        <p>Submits form data to a non-tracker URL for comparison. This should NOT be blocked.</p>
+        
+        <div class="form-display">&lt;form action="test6-form-target.html" method="POST" target="_blank"&gt;</div>
+        
+        <form id="safeForm" action="test6-form-target.html" method="POST" target="_blank">
+            <input type="hidden" name="test" value="true">
+            <input type="hidden" name="timestamp" id="timestampB">
+            <input type="hidden" name="source" value="csp-test-form-baseline">
+            <input type="submit" value="Submit to Safe Page (new window)">
+        </form>
+    </div>
+
+    <!-- Test 3: Form POST to tracker with rel="opener" explicitly -->
+    <div class="test-section">
+        <h3>Test C: Form POST to Facebook Tracker</h3>
+        <p>Submits to Facebook's tracking pixel endpoint.</p>
+        
+        <div class="form-display">&lt;form action="https://www.facebook.com/tr" method="POST" target="_blank"&gt;</div>
+        
+        <form id="fbForm" action="https://www.facebook.com/tr" method="POST" target="_blank">
+            <input type="hidden" name="test" value="true">
+            <input type="hidden" name="timestamp" id="timestampC">
+            <input type="submit" value="Submit to Facebook (new window)">
+        </form>
+    </div>
+
+    <div id="results">
+        <div class="result-item pending">Submit a form above. The new window will report back its window.opener status.</div>
+    </div>
+
+    <h3>How to Interpret Results</h3>
+    <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+        <tr style="background: #f5f5f5;">
+            <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">Outcome</th>
+            <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">What it means</th>
+        </tr>
+        <tr>
+            <td style="border: 1px solid #ddd; padding: 10px;">New window opens + has window.opener</td>
+            <td style="border: 1px solid #ddd; padding: 10px;">Normal behavior, opener relationship preserved</td>
+        </tr>
+        <tr>
+            <td style="border: 1px solid #ddd; padding: 10px;">New window opens + NO window.opener</td>
+            <td style="border: 1px solid #ddd; padding: 10px;">Opener relationship broken (potential bug)</td>
+        </tr>
+        <tr>
+            <td style="border: 1px solid #ddd; padding: 10px;">New window doesn't open</td>
+            <td style="border: 1px solid #ddd; padding: 10px;">Navigation was completely blocked</td>
+        </tr>
+        <tr>
+            <td style="border: 1px solid #ddd; padding: 10px;">New window shows error page</td>
+            <td style="border: 1px solid #ddd; padding: 10px;">Blocked with error response (check window.opener)</td>
+        </tr>
+    </table>
+
+    <script>
+        // Set timestamps on form fields
+        document.getElementById('timestampA').value = Date.now();
+        document.getElementById('timestampB').value = Date.now();
+        document.getElementById('timestampC').value = Date.now();
+        
+        // Update timestamps on form submit
+        document.getElementById('trackerForm').addEventListener('submit', () => {
+            document.getElementById('timestampA').value = Date.now();
+        });
+        document.getElementById('safeForm').addEventListener('submit', () => {
+            document.getElementById('timestampB').value = Date.now();
+        });
+        document.getElementById('fbForm').addEventListener('submit', () => {
+            document.getElementById('timestampC').value = Date.now();
+        });
+        
+        // Listen for messages from child windows
+        window.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'form-target-results') {
+                const resultsDiv = document.getElementById('results');
+                const data = event.data;
+                
+                let html = `<h4>Results from: ${data.formAction || 'unknown'}</h4>`;
+                
+                if (data.openerAccessible) {
+                    html += '<div class="result-item success">window.opener is accessible</div>';
+                    html += `<div class="result-item info">Opener location: ${data.openerLocation}</div>`;
+                } else {
+                    html += '<div class="result-item error">window.opener is NOT accessible</div>';
+                    html += `<div class="result-item info">Reason: ${data.openerError || 'null or undefined'}</div>`;
+                }
+                
+                if (data.postData) {
+                    html += `<div class="result-item info">POST data received: ${JSON.stringify(data.postData)}</div>`;
+                }
+                
+                if (data.referrer) {
+                    html += `<div class="result-item info">document.referrer: ${data.referrer}</div>`;
+                }
+                
+                resultsDiv.innerHTML = html;
+            }
+        });
+    </script>
+</body>
+</html>
