@@ -77,39 +77,6 @@ function serializeEvent (event) {
 }
 
 /**
- * Helper to get Performance Resource Timing entries
- */
-function getResourceTiming (urlPattern) {
-    const entries = performance.getEntriesByType('resource');
-    const matching = entries.filter(e => e.name.includes(urlPattern));
-
-    return matching.map(entry => ({
-        name: entry.name,
-        entryType: entry.entryType,
-        startTime: entry.startTime,
-        duration: entry.duration,
-        initiatorType: entry.initiatorType,
-        nextHopProtocol: entry.nextHopProtocol,
-        transferSize: entry.transferSize,
-        encodedBodySize: entry.encodedBodySize,
-        decodedBodySize: entry.decodedBodySize,
-        responseStatus: entry.responseStatus,
-        serverTiming: entry.serverTiming ? [...entry.serverTiming] : [],
-        connectStart: entry.connectStart,
-        connectEnd: entry.connectEnd,
-        domainLookupStart: entry.domainLookupStart,
-        domainLookupEnd: entry.domainLookupEnd,
-        fetchStart: entry.fetchStart,
-        redirectStart: entry.redirectStart,
-        redirectEnd: entry.redirectEnd,
-        requestStart: entry.requestStart,
-        responseStart: entry.responseStart,
-        responseEnd: entry.responseEnd,
-        secureConnectionStart: entry.secureConnectionStart
-    }));
-}
-
-/**
  * Render a result table for a test
  */
 function renderResultTable (data, container) {
@@ -154,8 +121,7 @@ const tests = [
                 url,
                 success: false,
                 response: null,
-                error: null,
-                resourceTiming: null
+                error: null
             };
 
             try {
@@ -179,10 +145,6 @@ const tests = [
             } catch (e) {
                 result.error = serializeError(e);
             }
-
-            // Wait a bit for resource timing to be available
-            await new Promise(resolve => setTimeout(resolve, 100));
-            result.resourceTiming = getResourceTiming(`fetch-basic-${random}`);
 
             return result;
         }
@@ -214,9 +176,6 @@ const tests = [
                 result.error = serializeError(e);
             }
 
-            await new Promise(resolve => setTimeout(resolve, 100));
-            result.resourceTiming = getResourceTiming(`fetch-cors-${random}`);
-
             return result;
         }
     },
@@ -246,9 +205,6 @@ const tests = [
             } catch (e) {
                 result.error = serializeError(e);
             }
-
-            await new Promise(resolve => setTimeout(resolve, 100));
-            result.resourceTiming = getResourceTiming(`fetch-no-cors-${random}`);
 
             return result;
         }
@@ -302,10 +258,7 @@ const tests = [
                         getAllResponseHeaders: xhr.getAllResponseHeaders()
                     };
 
-                    setTimeout(async () => {
-                        result.resourceTiming = getResourceTiming(`xhr-async-${random}`);
-                        resolve(result);
-                    }, 100);
+                    resolve(result);
                 });
 
                 xhr.open('GET', url, true);
@@ -374,10 +327,7 @@ const tests = [
                         width: img.width,
                         height: img.height
                     };
-                    setTimeout(async () => {
-                        result.resourceTiming = getResourceTiming(`img-element-${random}`);
-                        resolve(result);
-                    }, 100);
+                    resolve(result);
                 });
 
                 img.addEventListener('error', () => {
@@ -388,10 +338,7 @@ const tests = [
                         width: img.width,
                         height: img.height
                     };
-                    setTimeout(async () => {
-                        result.resourceTiming = getResourceTiming(`img-element-${random}`);
-                        resolve(result);
-                    }, 100);
+                    resolve(result);
                 });
 
                 img.src = url;
@@ -426,11 +373,8 @@ const tests = [
                 });
 
                 const finish = () => {
-                    setTimeout(async () => {
-                        result.resourceTiming = getResourceTiming(`script-element-${random}`);
-                        delete window[callbackName];
-                        resolve(result);
-                    }, 100);
+                    delete window[callbackName];
+                    resolve(result);
                 };
 
                 script.addEventListener('load', finish);
@@ -469,12 +413,9 @@ const tests = [
                 });
 
                 const finish = () => {
-                    setTimeout(async () => {
-                        result.styleApplied = window.getComputedStyle(testEl).content.includes('works');
-                        result.resourceTiming = getResourceTiming(`link-stylesheet-${random}`);
-                        testEl.remove();
-                        resolve(result);
-                    }, 100);
+                    result.styleApplied = window.getComputedStyle(testEl).content.includes('works');
+                    testEl.remove();
+                    resolve(result);
                 };
 
                 link.addEventListener('load', finish);
@@ -614,20 +555,15 @@ const tests = [
     {
         id: 'sendbeacon',
         name: 'sendBeacon()',
-        description: 'Tests navigator.sendBeacon return value and resource timing',
-        run: async () => {
+        description: 'Tests navigator.sendBeacon return value',
+        run: () => {
             const url = `https://${TRACKER_DOMAIN}/block-me/beacon?sendbeacon-${random}`;
             const result = {
                 url,
-                returnValue: null,
-                resourceTiming: null
+                returnValue: null
             };
 
             result.returnValue = navigator.sendBeacon(url, 'test=data');
-
-            // Wait for resource timing
-            await new Promise(resolve => setTimeout(resolve, 500));
-            result.resourceTiming = getResourceTiming(`sendbeacon-${random}`);
 
             return result;
         }
@@ -676,7 +612,6 @@ const tests = [
 
                     setTimeout(() => {
                         window.removeEventListener('message', onMessage);
-                        result.resourceTiming = getResourceTiming(`iframe-src-${random}`);
                         iframe.remove();
                         resolve(result);
                     }, 500);
@@ -710,13 +645,10 @@ const tests = [
                 });
 
                 const finish = () => {
-                    setTimeout(() => {
-                        const rect = obj.getBoundingClientRect();
-                        result.size = { width: rect.width, height: rect.height };
-                        result.resourceTiming = getResourceTiming(`object-data-${random}`);
-                        obj.remove();
-                        resolve(result);
-                    }, 100);
+                    const rect = obj.getBoundingClientRect();
+                    result.size = { width: rect.width, height: rect.height };
+                    obj.remove();
+                    resolve(result);
                 };
 
                 obj.addEventListener('load', finish);
@@ -765,10 +697,7 @@ const tests = [
                             message: audio.error.message
                         };
                     }
-                    setTimeout(() => {
-                        result.resourceTiming = getResourceTiming(`audio-src-${random}`);
-                        resolve(result);
-                    }, 100);
+                    resolve(result);
                 };
 
                 audio.addEventListener('error', finish);
@@ -816,10 +745,7 @@ const tests = [
                             message: video.error.message
                         };
                     }
-                    setTimeout(() => {
-                        result.resourceTiming = getResourceTiming(`video-src-${random}`);
-                        resolve(result);
-                    }, 100);
+                    resolve(result);
                 };
 
                 video.addEventListener('error', finish);
@@ -829,54 +755,6 @@ const tests = [
                 setTimeout(finish, 3000);
 
                 video.src = url;
-            });
-        }
-    },
-    {
-        id: 'performance-observer',
-        name: 'Performance Observer',
-        description: 'Tests what resource timing data is exposed for blocked requests via PerformanceObserver',
-        run: () => {
-            return new Promise((resolve) => {
-                const url = `${TRACKER_URL}/fetch.json?perf-observer-${random}`;
-                const result = {
-                    url,
-                    observedEntries: [],
-                    fetchError: null
-                };
-
-                const observer = new PerformanceObserver((list) => {
-                    list.getEntries().forEach(entry => {
-                        if (entry.name.includes(`perf-observer-${random}`)) {
-                            result.observedEntries.push({
-                                name: entry.name,
-                                entryType: entry.entryType,
-                                startTime: entry.startTime,
-                                duration: entry.duration,
-                                initiatorType: entry.initiatorType,
-                                transferSize: entry.transferSize,
-                                encodedBodySize: entry.encodedBodySize,
-                                decodedBodySize: entry.decodedBodySize,
-                                responseStatus: entry.responseStatus,
-                                nextHopProtocol: entry.nextHopProtocol
-                            });
-                        }
-                    });
-                });
-
-                observer.observe({ entryTypes: ['resource'] });
-
-                fetch(url)
-                    .then(r => r.json())
-                    .catch(e => {
-                        result.fetchError = serializeError(e);
-                    })
-                    .finally(() => {
-                        setTimeout(() => {
-                            observer.disconnect();
-                            resolve(result);
-                        }, 500);
-                    });
             });
         }
     }
