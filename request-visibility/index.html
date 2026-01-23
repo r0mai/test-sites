@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Request Visibility Test Page</title>
+
+        <script src='./main.js' defer></script>
+        <link href='./style.css' rel='stylesheet'></link>
+    </head>
+    <body>
+        <p><a href="../../">[Home]</a> ↣ <a href="../">[Privacy Protections Tests]</a> ↣ <strong>[Request Visibility Test Page]</strong></p>
+
+        <p>This page tests what observable information is exposed when a tracker URL is blocked.</p>
+        <p>The goal is to ensure that after refactoring request blocking, websites see identical errors and cannot detect any change.</p>
+        <p>Blocked domain: <strong>bad.third-party.site</strong></p>
+
+        <button id='start'>Start the test</button>
+        <button id='download' disabled='disabled'>Download the results</button>
+
+        <div id='results'></div>
+    </body>
+</html>
