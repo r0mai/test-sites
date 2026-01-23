@@ -17,7 +17,7 @@ function initTestRun () {
 
 // Object that contains results of all tests
 const results = {
-    page: 'request-visibility',
+    page: 'blocking-behaviour',
     date: null,
     testedDomain: null,
     results: []
@@ -914,7 +914,7 @@ function downloadTheResults () {
     const a = document.createElement('a');
     const url = window.URL.createObjectURL(new Blob([data], { type: 'application/json' }));
     a.href = url;
-    a.download = 'request-visibility-results.json';
+    a.download = 'blocking-behaviour-results.json';
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);
