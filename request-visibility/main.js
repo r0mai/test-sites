@@ -1,16 +1,25 @@
 /* eslint-disable n/no-callback-literal */
-const random = Math.random();
 const resultsDiv = document.querySelector('#results');
 const startButton = document.querySelector('#start');
 const downloadButton = document.querySelector('#download');
+const domainSelect = document.querySelector('#domain-select');
 
-const TRACKER_DOMAIN = 'bad.third-party.site';
-const TRACKER_URL = `https://${TRACKER_DOMAIN}/privacy-protections/request-blocking/block-me`;
+// These are computed at test run time based on the selected domain
+let TESTED_DOMAIN = '';
+let TESTED_URL = '';
+let random = 0;
+
+function initTestRun () {
+    random = Math.random();
+    TESTED_DOMAIN = domainSelect.value;
+    TESTED_URL = `https://${TESTED_DOMAIN}/privacy-protections/request-blocking/block-me`;
+}
 
 // Object that contains results of all tests
 const results = {
     page: 'request-visibility',
     date: null,
+    testedDomain: null,
     results: []
 };
 
@@ -188,7 +197,7 @@ const tests = [
         name: 'fetch() - Basic Request',
         description: 'Tests fetch() error behavior and captured exception details',
         run: async () => {
-            const url = `${TRACKER_URL}/fetch.json?fetch-basic-${random}`;
+            const url = `${TESTED_URL}/fetch.json?fetch-basic-${random}`;
             const result = {
                 url,
                 success: false,
@@ -226,7 +235,7 @@ const tests = [
         name: 'fetch() - CORS Mode',
         description: 'Tests fetch() with explicit CORS mode',
         run: async () => {
-            const url = `${TRACKER_URL}/fetch.json?fetch-cors-${random}`;
+            const url = `${TESTED_URL}/fetch.json?fetch-cors-${random}`;
             const result = {
                 url,
                 success: false,
@@ -256,7 +265,7 @@ const tests = [
         name: 'fetch() - No-CORS Mode',
         description: 'Tests fetch() with no-cors mode (opaque response)',
         run: async () => {
-            const url = `${TRACKER_URL}/fetch.json?fetch-no-cors-${random}`;
+            const url = `${TESTED_URL}/fetch.json?fetch-no-cors-${random}`;
             const result = {
                 url,
                 success: false,
@@ -287,7 +296,7 @@ const tests = [
         description: 'Tests XHR with all event handlers and state tracking',
         run: () => {
             return new Promise((resolve) => {
-                const url = `${TRACKER_URL}/ajax.json?xhr-async-${random}`;
+                const url = `${TESTED_URL}/ajax.json?xhr-async-${random}`;
                 const result = {
                     url,
                     events: [],
@@ -343,7 +352,7 @@ const tests = [
         name: 'XMLHttpRequest - Sync',
         description: 'Tests synchronous XHR behavior when blocked',
         run: () => {
-            const url = `${TRACKER_URL}/ajax.json?xhr-sync-${random}`;
+            const url = `${TESTED_URL}/ajax.json?xhr-sync-${random}`;
             const result = {
                 url,
                 exception: null,
@@ -376,7 +385,7 @@ const tests = [
         description: 'Tests Image() constructor load/error events',
         run: () => {
             return new Promise((resolve) => {
-                const url = `${TRACKER_URL}/img.jpg?img-element-${random}`;
+                const url = `${TESTED_URL}/img.jpg?img-element-${random}`;
                 const result = {
                     url,
                     events: [],
@@ -423,7 +432,7 @@ const tests = [
         description: 'Tests dynamically created script element load/error events',
         run: () => {
             return new Promise((resolve) => {
-                const url = `${TRACKER_URL}/script.js?script-element-${random}`;
+                const url = `${TESTED_URL}/script.js?script-element-${random}`;
                 const result = {
                     url,
                     events: [],
@@ -463,7 +472,7 @@ const tests = [
         description: 'Tests dynamically created stylesheet link element',
         run: () => {
             return new Promise((resolve) => {
-                const url = `${TRACKER_URL}/style.css?link-stylesheet-${random}`;
+                const url = `${TESTED_URL}/style.css?link-stylesheet-${random}`;
                 const result = {
                     url,
                     events: [],
@@ -504,7 +513,7 @@ const tests = [
         description: 'Tests WebSocket connection error details',
         run: () => {
             return new Promise((resolve) => {
-                const url = `wss://${TRACKER_DOMAIN}/block-me/web-socket?${random}`;
+                const url = `wss://${TESTED_DOMAIN}/block-me/web-socket?${random}`;
                 const result = {
                     url,
                     events: [],
@@ -576,7 +585,7 @@ const tests = [
         description: 'Tests Server-Sent Events connection error details',
         run: () => {
             return new Promise((resolve) => {
-                const url = `https://${TRACKER_DOMAIN}/block-me/server-sent-events?${random}`;
+                const url = `https://${TESTED_DOMAIN}/block-me/server-sent-events?${random}`;
                 const result = {
                     url,
                     events: [],
@@ -629,7 +638,7 @@ const tests = [
         name: 'sendBeacon()',
         description: 'Tests navigator.sendBeacon return value',
         run: () => {
-            const url = `https://${TRACKER_DOMAIN}/block-me/beacon?sendbeacon-${random}`;
+            const url = `https://${TESTED_DOMAIN}/block-me/beacon?sendbeacon-${random}`;
             const result = {
                 url,
                 returnValue: null
@@ -646,7 +655,7 @@ const tests = [
         description: 'Tests iframe load behavior with blocked URL',
         run: () => {
             return new Promise((resolve) => {
-                const url = `${TRACKER_URL}/frame.html?iframe-src-${random}`;
+                const url = `${TESTED_URL}/frame.html?iframe-src-${random}`;
                 const result = {
                     url,
                     events: [],
@@ -700,7 +709,7 @@ const tests = [
         description: 'Tests object element with blocked data URL',
         run: () => {
             return new Promise((resolve) => {
-                const url = `${TRACKER_URL}/object.png?object-data-${random}`;
+                const url = `${TESTED_URL}/object.png?object-data-${random}`;
                 const result = {
                     url,
                     events: [],
@@ -740,7 +749,7 @@ const tests = [
         description: 'Tests audio element with blocked source',
         run: () => {
             return new Promise((resolve) => {
-                const url = `${TRACKER_URL}/audio.wav?audio-src-${random}`;
+                const url = `${TESTED_URL}/audio.wav?audio-src-${random}`;
                 const result = {
                     url,
                     events: [],
@@ -788,7 +797,7 @@ const tests = [
         description: 'Tests video element with blocked source',
         run: () => {
             return new Promise((resolve) => {
-                const url = `${TRACKER_URL}/video.mp4?video-src-${random}`;
+                const url = `${TESTED_URL}/video.mp4?video-src-${random}`;
                 const result = {
                     url,
                     events: [],
@@ -878,16 +887,23 @@ async function runTest (test) {
  * Run all tests
  */
 async function runTests () {
+    initTestRun();
+
     startButton.setAttribute('disabled', 'disabled');
+    domainSelect.setAttribute('disabled', 'disabled');
     downloadButton.removeAttribute('disabled');
 
     results.results = [];
     results.date = new Date().toUTCString();
+    results.testedDomain = TESTED_DOMAIN;
     resultsDiv.innerHTML = '';
 
     for (const test of tests) {
         await runTest(test);
     }
+
+    startButton.removeAttribute('disabled');
+    domainSelect.removeAttribute('disabled');
 }
 
 /**

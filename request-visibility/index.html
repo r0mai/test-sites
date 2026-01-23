@@ -13,7 +13,16 @@
 
         <p>This page tests what observable information is exposed when a tracker URL is blocked.</p>
         <p>The goal is to ensure that after refactoring request blocking, websites see identical errors and cannot detect any change.</p>
-        <p>Blocked domain: <strong>bad.third-party.site</strong></p>
+        <p>
+            Tested domain:
+            <select id='domain-select'>
+                <option value="bad.third-party.site" selected>bad.third-party.site (blocked tracker)</option>
+                <option value="broken.third-party.site">broken.third-party.site (tracker, not blocked)</option>
+                <option value="good.third-party.site">good.third-party.site (non-tracker)</option>
+                <option value="allowlisted.third-party.site">allowlisted.third-party.site (allowlisted)</option>
+                <option value="www.first-party.site">www.first-party.site (first-party)</option>
+            </select>
+        </p>
 
         <button id='start'>Start the test</button>
         <button id='download' disabled='disabled'>Download the results</button>
