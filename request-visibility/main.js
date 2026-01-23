@@ -82,6 +82,46 @@ function formatValue (value, key) {
         return { text: `${value.name}: ${value.message}${code}`, className: 'error-value' };
     }
 
+    // Format mediaError
+    if (key === 'mediaError' && typeof value === 'object') {
+        const msg = value.message ? `: ${value.message}` : '';
+        return { text: `code: ${value.code}${msg}`, className: 'error-value' };
+    }
+
+    // Format closeEvent (WebSocket)
+    if (key === 'closeEvent' && typeof value === 'object') {
+        return { text: `code: ${value.code}, wasClean: ${value.wasClean}, reason: "${value.reason || ''}"`, className: '' };
+    }
+
+    // Format size
+    if (key === 'size' && typeof value === 'object' && 'width' in value && 'height' in value) {
+        return { text: `${value.width} × ${value.height}`, className: '' };
+    }
+
+    // Format finalState as key: value pairs
+    if (key === 'finalState' && typeof value === 'object') {
+        const lines = Object.entries(value).map(([k, v]) => {
+            if (v === '') return `${k}: (empty)`;
+            return `${k}: ${v}`;
+        });
+        return { text: lines.join('\n'), className: '' };
+    }
+
+    // Format imageProperties
+    if (key === 'imageProperties' && typeof value === 'object') {
+        const lines = Object.entries(value).map(([k, v]) => `${k}: ${v}`);
+        return { text: lines.join('\n'), className: '' };
+    }
+
+    // Format response object
+    if (key === 'response' && typeof value === 'object') {
+        const lines = Object.entries(value).map(([k, v]) => {
+            if (typeof v === 'object') return `${k}: ${JSON.stringify(v)}`;
+            return `${k}: ${v}`;
+        });
+        return { text: lines.join('\n'), className: '' };
+    }
+
     // Format arrays of events more readably
     if (Array.isArray(value) && value.length > 0 && value[0].type) {
         const eventList = value.map(e => {
