@@ -66,6 +66,11 @@ button {
     font-style: italic;
 }
 
+.result-table td.error-value {
+    color: #c0392b;
+    font-weight: 500;
+}
+
 .status-indicator {
     display: inline-block;
     width: 12px;

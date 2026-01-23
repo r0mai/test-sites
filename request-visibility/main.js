@@ -15,28 +15,20 @@ const results = {
 };
 
 /**
- * Helper to serialize error objects
+ * Helper to serialize error objects (without stack trace for readability)
  */
 function serializeError (error) {
     if (!error) return null;
 
     const serialized = {
         name: error.name,
-        message: error.message,
-        toString: error.toString()
+        message: error.message
     };
 
-    // Capture all enumerable properties
-    for (const key of Object.keys(error)) {
-        serialized[key] = error[key];
+    // Capture code if present (e.g., DOMException code)
+    if (error.code !== undefined) {
+        serialized.code = error.code;
     }
-
-    // Capture common non-enumerable properties
-    ['stack', 'code', 'errno', 'syscall'].forEach(prop => {
-        if (error[prop] !== undefined) {
-            serialized[prop] = error[prop];
-        }
-    });
 
     return serialized;
 }
@@ -77,6 +69,49 @@ function serializeEvent (event) {
 }
 
 /**
+ * Format a value for display in the result table
+ */
+function formatValue (value, key) {
+    if (value === null || value === undefined) {
+        return { text: String(value), className: 'empty' };
+    }
+
+    // Special formatting for error objects
+    if (typeof value === 'object' && value.name && value.message && (key === 'error' || key === 'exception' || key.toLowerCase().includes('error'))) {
+        const code = value.code !== undefined ? ` (code: ${value.code})` : '';
+        return { text: `${value.name}: ${value.message}${code}`, className: 'error-value' };
+    }
+
+    // Format arrays of events more readably
+    if (Array.isArray(value) && value.length > 0 && value[0].type) {
+        const eventList = value.map(e => {
+            const extras = [];
+            if (e.loaded !== undefined) extras.push(`loaded: ${e.loaded}`);
+            if (e.code !== undefined) extras.push(`code: ${e.code}`);
+            if (e.reason !== undefined && e.reason !== '') extras.push(`reason: "${e.reason}"`);
+            if (e.wasClean !== undefined) extras.push(`wasClean: ${e.wasClean}`);
+            const extraStr = extras.length ? ` (${extras.join(', ')})` : '';
+            return `${e.type}${extraStr}`;
+        }).join('\n');
+        return { text: eventList, className: '' };
+    }
+
+    // Format state changes readably
+    if (Array.isArray(value) && value.length > 0 && value[0].readyState !== undefined) {
+        const stateList = value.map(s => {
+            return `[${s.event}] readyState: ${s.readyState}, status: ${s.status}`;
+        }).join('\n');
+        return { text: stateList, className: '' };
+    }
+
+    if (typeof value === 'object') {
+        return { text: JSON.stringify(value, null, 2), className: '' };
+    }
+
+    return { text: String(value), className: '' };
+}
+
+/**
  * Render a result table for a test
  */
 function renderResultTable (data, container) {
@@ -90,13 +125,10 @@ function renderResultTable (data, container) {
 
         th.textContent = key;
 
-        if (value === null || value === undefined) {
-            td.textContent = String(value);
-            td.className = 'empty';
-        } else if (typeof value === 'object') {
-            td.textContent = JSON.stringify(value, null, 2);
-        } else {
-            td.textContent = String(value);
+        const formatted = formatValue(value, key);
+        td.textContent = formatted.text;
+        if (formatted.className) {
+            td.className = formatted.className;
         }
 
         row.appendChild(th);
