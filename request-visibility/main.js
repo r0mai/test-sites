@@ -911,7 +911,8 @@ async function runTest (test) {
 
         const indicator = section.querySelector('.status-indicator');
         indicator.classList.remove('pending');
-        indicator.classList.add(result.error || result.exception || !result.success === false ? 'blocked' : 'loaded');
+        const isBlocked = result.error || result.exception || result.success === false;
+        indicator.classList.add(isBlocked ? 'blocked' : 'loaded');
 
         renderResultTable(result, section);
     } catch (e) {
