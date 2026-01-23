@@ -59,6 +59,7 @@ button {
 .result-table td {
     font-family: monospace;
     word-break: break-all;
+    white-space: pre-wrap;
 }
 
 .result-table td.empty {
