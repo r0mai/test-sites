@@ -841,7 +841,7 @@ async function runTest (test) {
     section.id = `test-${test.id}`;
 
     const header = document.createElement('h3');
-    header.innerHTML = `<span class="status-indicator pending"></span>${test.name}`;
+    header.textContent = test.name;
     section.appendChild(header);
 
     const description = document.createElement('p');
@@ -859,11 +859,6 @@ async function runTest (test) {
             data: result
         });
 
-        const indicator = section.querySelector('.status-indicator');
-        indicator.classList.remove('pending');
-        const isBlocked = result.error || result.exception || result.success === false;
-        indicator.classList.add(isBlocked ? 'blocked' : 'loaded');
-
         renderResultTable(result, section);
     } catch (e) {
         const errorResult = {
@@ -872,10 +867,6 @@ async function runTest (test) {
             testError: serializeError(e)
         };
         results.results.push(errorResult);
-
-        const indicator = section.querySelector('.status-indicator');
-        indicator.classList.remove('pending');
-        indicator.classList.add('blocked');
 
         const errorPre = document.createElement('pre');
         errorPre.textContent = `Test execution error: ${e.message}\n${e.stack}`;

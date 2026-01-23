@@ -72,27 +72,6 @@ button {
     font-weight: 500;
 }
 
-.status-indicator {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    margin-right: 8px;
-    background: #999;
-}
-
-.status-indicator.blocked {
-    background: #e74c3c;
-}
-
-.status-indicator.loaded {
-    background: #27ae60;
-}
-
-.status-indicator.pending {
-    background: #f39c12;
-}
-
 pre {
     background: #f8f8f8;
     padding: 10px;
