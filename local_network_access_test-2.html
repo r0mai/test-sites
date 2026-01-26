@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Local Network Access Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-item { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        .passed { background-color: #d4edda; }
+        .failed { background-color: #f8d7da; }
+        #test-result { font-size: 20px; font-weight: bold; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Local Network Access Test</h1>
+    <div id="test-container"></div>
+    <div id="test-result"></div>
+
+    <script>
+        window.testResults = {
+            completed: false,
+            passedCount: 0,
+            failedCount: 0,
+            failedTests: [],
+            details: []
+        };
+
+        const tests = [
+            { name: 'Localhost fetch (127.0.0.1)', url: 'http://127.0.0.1:5000/ping' },
+            { name: 'Localhost fetch (localhost)', url: 'http://localhost:5000/ping' }
+        ];
+
+        async function testEndpoint(name, url) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+                const response = await fetch(url, {
+                    method: 'GET',
+                    mode: 'cors',
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                if (response.ok) {
+                    return { name, url, status: 'passed', error: null };
+                } else {
+                    return { name, url, status: 'failed', error: `HTTP ${response.status}` };
+                }
+            } catch (error) {
+                const errorMsg = error.name === 'AbortError'
+                    ? 'Request timeout'
+                    : error.message;
+                return { name, url, status: 'failed', error: errorMsg };
+            }
+        }
+
+        async function runAllTests() {
+            const container = document.getElementById('test-container');
+            const results = await Promise.all(
+                tests.map(t => testEndpoint(t.name, t.url))
+            );
+
+            results.forEach(result => {
+                const div = document.createElement('div');
+                div.className = `test-item ${result.status}`;
+                div.textContent = `${result.name}: ${result.status.toUpperCase()}`;
+                if (result.error) {
+                    div.textContent += ` (${result.error})`;
+                }
+                container.appendChild(div);
+
+                // Store detailed results
+                window.testResults.details.push(result);
+
+                if (result.status === 'passed') {
+                    window.testResults.passedCount++;
+                } else {
+                    window.testResults.failedCount++;
+                    window.testResults.failedTests.push(result.name);
+                }
+            });
+
+            const resultDiv = document.getElementById('test-result');
+            if (window.testResults.failedCount === 0) {
+                resultDiv.textContent = 'PASSED';
+                resultDiv.style.color = 'green';
+            } else {
+                resultDiv.textContent = 'FAILED';
+                resultDiv.style.color = 'red';
+            }
+
+            window.testResults.completed = true;
+            return window.testResults;
+        }
+
+        // Auto-run on page load
+        window.addEventListener('load', () => {
+            setTimeout(runAllTests, 100);
+        });
+    </script>
+</body>
+</html>
