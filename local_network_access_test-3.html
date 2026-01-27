@@ -35,17 +35,15 @@ const tests = [
 
 async function testEndpoint(test) {
     const { id, name, url } = test;
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
 
+    try {
         const response = await fetch(url, {
             method: 'GET',
             mode: 'cors',
             signal: controller.signal
         });
-
-        clearTimeout(timeoutId);
 
         if (response.ok) {
             return { id, test: name, result: 'request loaded (not blocked)' };
@@ -57,6 +55,8 @@ async function testEndpoint(test) {
             ? 'request timeout (likely blocked or no server)'
             : `request blocked or failed (${error.message})`;
         return { id, test: name, result: errorMsg };
+    } finally {
+        clearTimeout(timeoutId);
     }
 }
 
