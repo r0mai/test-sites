@@ -81,10 +81,10 @@ async function runTests() {
 
         if (isLoaded) {
             loadedCount++;
-            li.style.color = 'red';
+            li.style.color = 'green';
         } else {
             blockedCount++;
-            li.style.color = 'green';
+            li.style.color = 'red';
         }
 
         li.textContent = `${testResult.test}: ${testResult.result}`;
@@ -93,7 +93,7 @@ async function runTests() {
 
     testsSummary.textContent = `${blockedCount} blocked, ${loadedCount} loaded`;
     testsSummary.style.fontWeight = 'bold';
-    testsSummary.style.color = loadedCount === 0 ? 'green' : 'red';
+    testsSummary.style.color = blockedCount === 0 ? 'green' : 'red';
 
     startButton.removeAttribute('disabled');
 }
