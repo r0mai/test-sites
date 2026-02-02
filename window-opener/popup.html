@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head><title>Popup</title></head>
+<body>
+    <h1>Popup Window</h1>
+    <div id="result"></div>
+    <pre id="log"></pre>
+
+    <script>
+        function log(msg) {
+            document.getElementById('log').textContent += msg + '\n';
+        }
+
+        var hasOpener = !!window.opener;
+        document.getElementById('result').textContent = hasOpener ? 'SUCCESS: window.opener exists' : 'FAILED: window.opener is NULL';
+        document.getElementById('result').style.color = hasOpener ? 'green' : 'red';
+
+        log('window.opener: ' + window.opener);
+
+        if (window.opener) {
+            try {
+                window.opener.postMessage({hasOpener: true}, '*');
+                log('postMessage sent');
+            } catch (e) {
+                log('postMessage error: ' + e);
+            }
+        }
+    </script>
+</body>
+</html>
