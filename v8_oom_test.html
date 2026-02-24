@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>V8 OOM Test</title>
+</head>
+<body>
+  <h2>V8 Out of Memory Test</h2>
+  <p>Click the button to exhaust the V8 heap until the renderer is killed with OOM (exit code 0xe0000008).</p>
+  <button onclick="triggerOOM()">Trigger OOM</button>
+  <p id="status"></p>
+  <script>
+    function triggerOOM() {
+      const status = document.getElementById("status");
+      status.textContent = "Exhausting V8 heap...";
+
+      // Strategy: keep an array of arrays. Each inner array holds ~10k
+      // unique objects with string payloads. All reachable from the root
+      // array so GC can't reclaim anything. No single collection hits
+      // V8's per-collection size limit.
+      const root = [];
+      let totalObjects = 0;
+      let mb = 0;
+
+      function burst() {
+        for (let i = 0; i < 5; i++) {
+          const chunk = [];
+          for (let j = 0; j < 10000; j++) {
+            chunk.push({ k: totalObjects++, s: String(totalObjects).repeat(20) });
+          }
+          root.push(chunk);
+        }
+        // ~300 bytes per object * 50k per burst ≈ 15 MB per burst
+        mb = Math.round(totalObjects * 300 / (1024 * 1024));
+        status.textContent = totalObjects.toLocaleString() + " objects (~" + mb + " MB)";
+        setTimeout(burst, 0);
+      }
+
+      burst();
+    }
+  </script>
+</body>
+</html>
