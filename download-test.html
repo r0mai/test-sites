@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download Test</title>
+</head>
+<body>
+    <h1>Download Test</h1>
+    <p>Click the link below to trigger a file download in a new tab.</p>
+    <a id="download-link" href="#" target="_blank">Download file</a>
+
+    <script>
+        // Create a small text file as a Blob and generate an object URL
+        const blob = new Blob(["Hello, this is a test file.\n"], { type: "application/octet-stream" });
+        const url = URL.createObjectURL(blob);
+
+        // Build a helper HTML page that triggers the download then closes itself
+        const downloaderHTML = `<!DOCTYPE html>
+<html>
+<head><title>Downloading...</title></head>
+<body>
+<script>
+    const a = document.createElement("a");
+    a.href = "${url}";
+    a.download = "test-file.txt";
+    document.body.appendChild(a);
+    a.click();
+    // Close this tab shortly after the download starts
+    setTimeout(function() { window.close(); }, 500);
+<\/script>
+</body>
+</html>`;
+
+        const downloaderBlob = new Blob([downloaderHTML], { type: "text/html" });
+        const downloaderURL = URL.createObjectURL(downloaderBlob);
+
+        document.getElementById("download-link").href = downloaderURL;
+    </script>
+</body>
+</html>
