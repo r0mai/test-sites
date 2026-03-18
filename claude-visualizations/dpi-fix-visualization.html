@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DPI Scale Fix Visualization</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0d1117; color: #c9d1d9; line-height: 1.5; }
+
+  .header { text-align: center; padding: 40px 20px 20px; }
+  .header h1 { font-size: 1.6rem; color: #e6edf3; margin-bottom: 6px; }
+  .header p { color: #8b949e; font-size: 0.9rem; max-width: 700px; margin: 0 auto; }
+
+  .architecture { max-width: 900px; margin: 30px auto; padding: 0 20px; }
+  .architecture h2 { font-size: 1.1rem; color: #e6edf3; margin-bottom: 12px; text-align: center; }
+  .arch-diagram { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 24px; display: flex; gap: 12px; align-items: stretch; justify-content: center; flex-wrap: wrap; }
+  .arch-box { border-radius: 6px; padding: 12px 16px; text-align: center; font-size: 0.8rem; flex: 1; min-width: 140px; }
+  .arch-box .label { font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; }
+  .arch-box .detail { color: #8b949e; font-size: 0.75rem; }
+  .arch-host { background: #1a1f2b; border: 1px solid #388bfd44; }
+  .arch-screen { background: #1a1f2b; border: 1px solid #f0883e44; }
+  .arch-renderer { background: #1a1f2b; border: 1px solid #a371f744; }
+  .arch-arrow { display: flex; align-items: center; color: #484f58; font-size: 1.2rem; flex: 0; min-width: 30px; justify-content: center; }
+
+  .root-cause { max-width: 900px; margin: 30px auto; padding: 0 20px; }
+  .root-cause h2 { font-size: 1.1rem; color: #e6edf3; margin-bottom: 12px; text-align: center; }
+  .root-cause-box { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px 24px; font-size: 0.85rem; color: #8b949e; }
+  .root-cause-box p { margin-bottom: 8px; }
+  .root-cause-box strong { color: #c9d1d9; }
+  .root-cause-box code { background: #1a1f2b; padding: 1px 5px; border-radius: 3px; font-size: 0.8rem; color: #79c0ff; }
+
+  .scenarios { max-width: 900px; margin: 30px auto; padding: 0 20px; }
+  .scenarios h2 { font-size: 1.1rem; color: #e6edf3; margin-bottom: 16px; text-align: center; }
+
+  .scenario-tabs { display: flex; gap: 6px; margin-bottom: 16px; justify-content: center; flex-wrap: wrap; }
+  .scenario-tab { padding: 6px 16px; border-radius: 20px; border: 1px solid #30363d; background: #161b22; color: #8b949e; cursor: pointer; font-size: 0.8rem; transition: all 0.2s; }
+  .scenario-tab:hover { border-color: #484f58; color: #c9d1d9; }
+  .scenario-tab.active { background: #388bfd22; border-color: #388bfd; color: #58a6ff; }
+  .scenario-tab.active-bug { background: #f8514922; border-color: #f85149; color: #f85149; }
+  .scenario-tab.active-fix { background: #3fb95022; border-color: #3fb950; color: #3fb950; }
+
+  .scenario-content { display: none; }
+  .scenario-content.active { display: block; }
+
+  .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .comparison { grid-template-columns: 1fr; } }
+
+  .panel { background: #161b22; border: 1px solid #30363d; border-radius: 8px; overflow: hidden; }
+  .panel-header { padding: 10px 16px; font-weight: 600; font-size: 0.85rem; border-bottom: 1px solid #30363d; }
+  .panel-header.bug { background: #f8514915; color: #f85149; }
+  .panel-header.fix { background: #3fb95015; color: #3fb950; }
+  .panel-body { padding: 0; }
+
+  .step { padding: 10px 16px; border-bottom: 1px solid #21262d; font-size: 0.78rem; display: flex; gap: 10px; align-items: flex-start; transition: background 0.3s; position: relative; }
+  .step:last-child { border-bottom: none; }
+  .step.highlight { background: #f8514910; }
+  .step.highlight-good { background: #3fb95010; }
+  .step.active-step { background: #388bfd15; }
+
+  .step-num { min-width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .step-num.normal { background: #30363d; color: #8b949e; }
+  .step-num.bad { background: #f8514933; color: #f85149; }
+  .step-num.good { background: #3fb95033; color: #3fb950; }
+  .step-num.new { background: #388bfd33; color: #58a6ff; }
+  .step-num.skip { background: #a371f733; color: #a371f7; }
+
+  .step-content { flex: 1; }
+  .step-content .action { color: #c9d1d9; margin-bottom: 2px; }
+  .step-content .state { color: #8b949e; font-size: 0.72rem; }
+  .step-content .state code { background: #1a1f2b; padding: 0 4px; border-radius: 2px; font-size: 0.72rem; }
+  .step-content .bad-val { color: #f85149; font-weight: 600; }
+  .step-content .good-val { color: #3fb950; font-weight: 600; }
+  .step-content .new-tag { background: #388bfd33; color: #58a6ff; padding: 1px 6px; border-radius: 3px; font-size: 0.65rem; font-weight: 600; margin-left: 4px; }
+  .step-content .skip-tag { background: #a371f733; color: #a371f7; padding: 1px 6px; border-radius: 3px; font-size: 0.65rem; font-weight: 600; margin-left: 4px; }
+
+  .result-box { margin: 12px 16px 16px; padding: 10px 14px; border-radius: 6px; font-size: 0.8rem; }
+  .result-bad { background: #f8514915; border: 1px solid #f8514933; }
+  .result-good { background: #3fb95015; border: 1px solid #3fb95033; }
+  .result-bad .result-label { color: #f85149; font-weight: 600; }
+  .result-good .result-label { color: #3fb950; font-weight: 600; }
+  .result-detail { color: #8b949e; font-size: 0.75rem; margin-top: 2px; }
+
+  .display-viz { max-width: 900px; margin: 30px auto; padding: 0 20px; }
+  .display-viz h2 { font-size: 1.1rem; color: #e6edf3; margin-bottom: 12px; text-align: center; }
+  .displays { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+  .display-box { border-radius: 8px; padding: 16px; text-align: center; min-width: 200px; }
+  .display-100 { background: #161b22; border: 2px solid #388bfd55; }
+  .display-125 { background: #161b22; border: 2px solid #f0883e55; }
+  .display-box .disp-label { font-weight: 600; font-size: 0.85rem; margin-bottom: 6px; }
+  .display-100 .disp-label { color: #58a6ff; }
+  .display-125 .disp-label { color: #f0883e; }
+  .display-box .disp-detail { color: #8b949e; font-size: 0.75rem; }
+
+  .timeline-legend { display: flex; gap: 16px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.75rem; color: #8b949e; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  .footer { text-align: center; padding: 30px 20px; color: #484f58; font-size: 0.75rem; }
+
+  a.coderef { color: #79c0ff; text-decoration: none; border-bottom: 1px dotted #79c0ff44; }
+  a.coderef:hover { color: #a5d6ff; border-bottom-color: #a5d6ff88; }
+  code a.coderef { border-bottom: none; }
+
+  .file-refs { max-width: 900px; margin: 30px auto; padding: 0 20px; }
+  .file-refs h2 { font-size: 1.1rem; color: #e6edf3; margin-bottom: 12px; text-align: center; }
+  .file-refs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 700px) { .file-refs-grid { grid-template-columns: 1fr; } }
+  .file-ref-card { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 12px 16px; }
+  .file-ref-card .file-name { font-size: 0.8rem; font-weight: 600; color: #e6edf3; margin-bottom: 6px; font-family: monospace; }
+  .file-ref-card .file-name a { color: #58a6ff; text-decoration: none; }
+  .file-ref-card .file-name a:hover { text-decoration: underline; }
+  .file-ref-card ul { list-style: none; padding: 0; }
+  .file-ref-card li { font-size: 0.75rem; color: #8b949e; padding: 2px 0; }
+  .file-ref-card li a { color: #79c0ff; text-decoration: none; }
+  .file-ref-card li a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Cross-DPI Display Transition Fix</h1>
+  <p>How hidden tabs get the wrong scale factor during display changes, and how the fix corrects it</p>
+</div>
+
+<div class="display-viz">
+  <h2>Display Setup</h2>
+  <div class="displays">
+    <div class="display-box display-100">
+      <div class="disp-label">Primary Display</div>
+      <div class="disp-detail">2560 &times; 1440 px</div>
+      <div class="disp-detail">Scale: <strong style="color:#58a6ff">1.0</strong> (100%)</div>
+      <div class="disp-detail">DPI: 96</div>
+    </div>
+    <div class="display-box display-125">
+      <div class="disp-label">Secondary Display</div>
+      <div class="disp-detail">3840 &times; 2160 px</div>
+      <div class="disp-detail">Scale: <strong style="color:#f0883e">1.25</strong> (125%)</div>
+      <div class="disp-detail">DPI: 120</div>
+    </div>
+  </div>
+</div>
+
+<div class="architecture">
+  <h2>The Two Sources of Scale (Root Cause)</h2>
+  <div class="arch-diagram">
+    <div class="arch-box arch-host">
+      <div class="label">WindowTreeHost</div>
+      <div class="detail"><code data-src="ui/aura/window_tree_host.h:490">device_scale_factor_</code></div>
+      <div class="detail" style="margin-top:4px">Set by <code data-src="ui/aura/window_tree_host.cc:594">OnHostResizedInPixels</code><br>via <code data-src="ui/display/win/screen_win.cc:958">GetPreferredScaleFactorForWindow</code></div>
+      <div class="detail" style="margin-top:4px">Controls: DIP bounds of<br>the aura Window tree</div>
+    </div>
+    <div class="arch-arrow">&ne;</div>
+    <div class="arch-box arch-screen">
+      <div class="label">screen_infos_</div>
+      <div class="detail"><code data-src="content/browser/renderer_host/render_widget_host_view_base.cc:631">device_scale_factor</code></div>
+      <div class="detail" style="margin-top:4px">Set by <code data-src="content/browser/renderer_host/render_widget_host_view_base.cc:476">UpdateScreenInfo</code><br>via <code data-src="ui/display/win/screen_win.cc:949">GetDisplayNearestWindow</code></div>
+      <div class="detail" style="margin-top:4px">Controls: scale factor<br>sent to renderer</div>
+    </div>
+    <div class="arch-arrow">&rarr;</div>
+    <div class="arch-box arch-renderer">
+      <div class="label">Renderer</div>
+      <div class="detail"><code data-src="content/browser/renderer_host/render_widget_host_view_base.cc:151">device_px = DIP &times; scale</code></div>
+      <div class="detail" style="margin-top:4px">Gets DIP from host,<br>scale from screen_infos</div>
+      <div class="detail" style="margin-top:4px">Mismatch &rarr; wrong<br>rendering</div>
+    </div>
+  </div>
+
+  <div class="root-cause-box" style="margin-top: 16px;">
+    <p><strong>Why they diverge:</strong> In DDG's CEF architecture, each tab has its own child HWND and <code>WindowTreeHost</code>. Unlike Chrome (one top-level HWND shared by all tabs), hidden tabs don't receive <code>WM_SIZE</code>/<code>WM_DPICHANGED</code> &mdash; so their host scale goes stale.</p>
+    <p>The <code data-src="content/browser/renderer_host/render_widget_host_view_aura.cc:2255">OnDisplayMetricsChanged</code> notification reaches all tabs, but Chromium's original code <strong>deferred</strong> the update when the scales didn't match, waiting for a <code>WM_SIZE</code> that never comes for hidden tabs.</p>
+  </div>
+</div>
+
+<div class="scenarios">
+  <h2>Event Sequences</h2>
+
+  <div class="scenario-tabs">
+    <div class="scenario-tab active-bug active" onclick="showScenario('zoomed')">Zoomed / Oversized</div>
+    <div class="scenario-tab" onclick="showScenario('blurry')">Blurry Rendering</div>
+    <div class="scenario-tab" onclick="showScenario('blank')">Blank / Stuck Tab</div>
+  </div>
+
+  <!-- ==================== SCENARIO 1: ZOOMED ==================== -->
+  <div class="scenario-content active" id="scenario-zoomed">
+    <p style="color:#8b949e; font-size:0.8rem; text-align:center; margin-bottom:12px;">
+      Window moves from 100% to 125% display. Hidden tab shown afterwards.
+    </p>
+    <div class="comparison">
+      <div class="panel">
+        <div class="panel-header bug">Original Behavior (Bug)</div>
+        <div class="panel-body">
+          <div class="step">
+            <div class="step-num normal">1</div>
+            <div class="step-content">
+              <div class="action">Window on 100% display, tab is hidden</div>
+              <div class="state">host: <code>scale=1.0</code> DIP: <code>2560&times;1273</code></div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num normal">2</div>
+            <div class="step-content">
+              <div class="action">Window moves to 125% display</div>
+              <div class="state">WPF resizes CefView &rarr; child HWND gets <code>WM_SIZE(3840, 1951)</code></div>
+            </div>
+          </div>
+          <div class="step highlight">
+            <div class="step-num bad">3</div>
+            <div class="step-content">
+              <div class="action"><code data-src="ui/aura/window_tree_host.cc:594">OnHostResizedInPixels</code> runs</div>
+              <div class="state"><code data-src="ui/display/win/screen_win.cc:958">GetPreferredScaleFactorForWindow</code> returns <span class="bad-val">1.0</span> (stale!)</div>
+              <div class="state">DIP = 3840 / <span class="bad-val">1.0</span> = <span class="bad-val">3840</span> (should be 3072)</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num normal">4</div>
+            <div class="step-content">
+              <div class="action">User switches to hidden tab &rarr; <code data-src="content/browser/renderer_host/render_widget_host_view_aura.cc:1018">ShowWithVisibility</code></div>
+              <div class="state"><code data-src="content/browser/renderer_host/render_widget_host_view_base.cc:476">UpdateScreenInfo</code> &rarr; screen_infos: <code>scale=1.25</code> (correct)</div>
+            </div>
+          </div>
+          <div class="step highlight">
+            <div class="step-num bad">5</div>
+            <div class="step-content">
+              <div class="action"><code data-src="content/browser/renderer_host/render_widget_host_impl.cc:1307">SynchronizeVisualProperties</code></div>
+              <div class="state">device_px = <span class="bad-val">3840</span> &times; 1.25 = <span class="bad-val">4800</span></div>
+              <div class="state">Renderer told viewport is 3840 DIP &mdash; 25% too wide</div>
+            </div>
+          </div>
+        </div>
+        <div class="result-box result-bad">
+          <div class="result-label">Content appears zoomed out / oversized</div>
+          <div class="result-detail">Rendered at 3840 DIP instead of 3072 DIP. Everything is 1.25&times; too large.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header fix">With Fix</div>
+        <div class="panel-body">
+          <div class="step">
+            <div class="step-num normal">1</div>
+            <div class="step-content">
+              <div class="action">Window on 100% display, tab is hidden</div>
+              <div class="state">host: <code>scale=1.0</code> DIP: <code>2560&times;1273</code></div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num normal">2</div>
+            <div class="step-content">
+              <div class="action">Window moves to 125% display</div>
+              <div class="state">Same stale <code>WM_SIZE</code> processing as before</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num normal">3</div>
+            <div class="step-content">
+              <div class="action">OnHostResizedInPixels runs (stale, same as bug)</div>
+              <div class="state">DIP = 3840 / 1.0 = 3840 (still wrong at this point)</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num normal">4</div>
+            <div class="step-content">
+              <div class="action">User switches to hidden tab &rarr; <code data-src="content/browser/renderer_host/render_widget_host_view_aura.cc:1018">ShowWithVisibility</code></div>
+              <div class="state"><code data-src="content/browser/renderer_host/render_widget_host_view_base.cc:476">UpdateScreenInfo</code> &rarr; screen_infos: <code>scale=1.25</code></div>
+            </div>
+          </div>
+          <div class="step highlight-good">
+            <div class="step-num new">5</div>
+            <div class="step-content">
+              <div class="action">Detect mismatch: host=1.0 &ne; screen=1.25 <span class="new-tag">NEW</span></div>
+              <div class="state"><code data-src="ui/aura/window_tree_host.cc:626">RefreshScaleAndBounds(1.25)</code></div>
+              <div class="state">DIP = 3840 / <span class="good-val">1.25</span> = <span class="good-val">3072</span></div>
+            </div>
+          </div>
+          <div class="step highlight-good">
+            <div class="step-num good">6</div>
+            <div class="step-content">
+              <div class="action">SynchronizeVisualProperties</div>
+              <div class="state">device_px = <span class="good-val">3072</span> &times; 1.25 = <span class="good-val">3840</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="result-box result-good">
+          <div class="result-label">Content renders correctly</div>
+          <div class="result-detail">3072 DIP at 1.25&times; = 3840 physical pixels. Sharp and correctly sized.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SCENARIO 2: BLURRY ==================== -->
+  <div class="scenario-content" id="scenario-blurry">
+    <p style="color:#8b949e; font-size:0.8rem; text-align:center; margin-bottom:12px;">
+      Secondary display disconnected. Browser falls back to 100% display.
+    </p>
+    <div class="comparison">
+      <div class="panel">
+        <div class="panel-header bug">Original Behavior (Bug)</div>
+        <div class="panel-body">
+          <div class="step">
+            <div class="step-num normal">1</div>
+            <div class="step-content">
+              <div class="action">Browser on 125% display</div>
+              <div class="state">host: <code>scale=1.25</code> DIP: <code>3072&times;1561</code></div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num normal">2</div>
+            <div class="step-content">
+              <div class="action">Display disconnected &rarr; ScreenWin updates</div>
+              <div class="state">Only 100% display remains</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num normal">3</div>
+            <div class="step-content">
+              <div class="action"><code data-src="content/browser/renderer_host/render_widget_host_view_aura.cc:2255">OnDisplayMetricsChanged</code> fires for all tabs</div>
+              <div class="state">display: <code>scale=1.0</code> compositor: <code>scale=1.25</code></div>
+            </div>
+          </div>
+          <div class="step highlight">
+            <div class="step-num bad">4</div>
+            <div class="step-content">
+              <div class="action">Scale mismatch &rarr; <span class="bad-val">DEFERRED</span></div>
+              <div class="state">Sets <code>needs_to_update_display_metrics_ = true</code></div>
+              <div class="state">Waits for <code>OnDeviceScaleFactorChanged</code>... which <span class="bad-val">never fires</span></div>
+            </div>
+          </div>
+          <div class="step highlight">
+            <div class="step-num bad">5</div>
+            <div class="step-content">
+              <div class="action">SynchronizeVisualProperties (from other path)</div>
+              <div class="state">screen_infos: <code>scale=1.0</code> DIP: <code>3072&times;1561</code></div>
+              <div class="state">device_px = 3072 &times; <span class="bad-val">1.0</span> = <span class="bad-val">3072</span> (needs 3840)</div>
+            </div>
+          </div>
+        </div>
+        <div class="result-box result-bad">
+          <div class="result-label">Content appears blurry</div>
+          <div class="result-detail">Renderer draws at 1&times; into 3072px buffer, compositor upscales to 3840px. 1.25&times; stretch = blurry.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header fix">With Fix</div>
+        <div class="panel-body">
+          <div class="step">
+            <div class="step-num normal">1</div>
+            <div class="step-content">
+              <div class="action">Browser on 125% display</div>
+              <div class="state">host: <code>scale=1.25</code> DIP: <code>3072&times;1561</code></div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num normal">2</div>
+            <div class="step-content">
+              <div class="action">Display disconnected &rarr; ScreenWin updates</div>
+              <div class="state">Only 100% display remains</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num normal">3</div>
+            <div class="step-content">
+              <div class="action">OnDisplayMetricsChanged fires for all tabs</div>
+              <div class="state">display: <code>scale=1.0</code> compositor: <code>scale=1.25</code></div>
+            </div>
+          </div>
+          <div class="step highlight-good">
+            <div class="step-num new">4</div>
+            <div class="step-content">
+              <div class="action">Scale mismatch &rarr; fix immediately <span class="new-tag">NEW</span></div>
+              <div class="state"><code data-src="ui/aura/window_tree_host.cc:626">RefreshScaleAndBounds(1.0)</code> with known display scale</div>
+              <div class="state">host: <span class="good-val">scale=1.0</span> &mdash; No deferral needed</div>
+            </div>
+          </div>
+          <div class="step highlight-good">
+            <div class="step-num good">5</div>
+            <div class="step-content">
+              <div class="action">ProcessDisplayMetricsChanged &rarr; SynchronizeVisualProperties</div>
+              <div class="state">scale=<span class="good-val">1.0</span> size=<span class="good-val">2560&times;1273</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="result-box result-good">
+          <div class="result-label">Content renders sharp</div>
+          <div class="result-detail">Renderer draws at 1&times; into 2560px buffer matching the 100% display. No upscale.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SCENARIO 3: BLANK ==================== -->
+  <div class="scenario-content" id="scenario-blank">
+    <p style="color:#8b949e; font-size:0.8rem; text-align:center; margin-bottom:12px;">
+      Display bounces (disconnect &rarr; reconnect). Scale returns to original but flag is stuck.
+    </p>
+    <div class="comparison">
+      <div class="panel">
+        <div class="panel-header bug">Original Behavior (Bug)</div>
+        <div class="panel-body">
+          <div class="step">
+            <div class="step-num normal">1</div>
+            <div class="step-content">
+              <div class="action">Tab on 125% display, scale=1.25</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num normal">2</div>
+            <div class="step-content">
+              <div class="action">Display disconnects</div>
+              <div class="state">OnDisplayMetricsChanged: compositor=1.25, display=1.0</div>
+            </div>
+          </div>
+          <div class="step highlight">
+            <div class="step-num bad">3</div>
+            <div class="step-content">
+              <div class="action">DEFERRED &mdash; <code data-src="content/browser/renderer_host/render_widget_host_view_aura.h:865">needs_to_update_display_metrics_</code> <code>= true</code></div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num normal">4</div>
+            <div class="step-content">
+              <div class="action">Display reconnects &mdash; scale returns to 1.25</div>
+              <div class="state"><code>OnDeviceScaleFactorChanged</code> doesn't fire (scale bounced back)</div>
+            </div>
+          </div>
+          <div class="step highlight">
+            <div class="step-num bad">5</div>
+            <div class="step-content">
+              <div class="action">Flag stuck: <code data-src="content/browser/renderer_host/render_widget_host_view_aura.h:865">needs_to_update_display_metrics_</code> <code>= true</code></div>
+              <div class="state"><code data-src="content/browser/renderer_host/render_widget_host_view_aura.cc:3560">CanSynchronizeVisualProperties()</code> returns <span class="bad-val">false</span></div>
+              <div class="state">All visual property syncs <span class="bad-val">blocked</span></div>
+            </div>
+          </div>
+          <div class="step highlight">
+            <div class="step-num bad">6</div>
+            <div class="step-content">
+              <div class="action">Tab activated &rarr; ShowWithVisibility &rarr; WasShown</div>
+              <div class="state">Eviction recovery blocked &mdash; renderer <span class="bad-val">cannot draw</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="result-box result-bad">
+          <div class="result-label">Tab is blank / frozen</div>
+          <div class="result-detail">The stuck flag blocks all visual property syncs. Renderer never receives draw instructions.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header fix">With Fix</div>
+        <div class="panel-body">
+          <div class="step">
+            <div class="step-num normal">1</div>
+            <div class="step-content">
+              <div class="action">Tab on 125% display, scale=1.25</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num normal">2</div>
+            <div class="step-content">
+              <div class="action">Display disconnects</div>
+              <div class="state">OnDisplayMetricsChanged: compositor=1.25, display=1.0</div>
+            </div>
+          </div>
+          <div class="step highlight-good">
+            <div class="step-num new">3</div>
+            <div class="step-content">
+              <div class="action">Fix immediately <span class="new-tag">NEW</span></div>
+              <div class="state"><code data-src="ui/aura/window_tree_host.cc:626">RefreshScaleAndBounds(1.0)</code></div>
+              <div class="state">Flag <span class="good-val">never set</span> &mdash; no deferral</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num normal">4</div>
+            <div class="step-content">
+              <div class="action">Display reconnects &mdash; scale returns to 1.25</div>
+              <div class="state">OnDisplayMetricsChanged fires again, fixes scale back to 1.25</div>
+            </div>
+          </div>
+          <div class="step highlight-good">
+            <div class="step-num good">5</div>
+            <div class="step-content">
+              <div class="action">Tab activated &rarr; ShowWithVisibility</div>
+              <div class="state"><code>CanSynchronizeVisualProperties()</code> returns <span class="good-val">true</span></div>
+              <div class="state">Renderer syncs and draws normally</div>
+            </div>
+          </div>
+        </div>
+        <div class="result-box result-good">
+          <div class="result-label">Tab renders normally</div>
+          <div class="result-detail">No stuck flag. Visual property syncs flow freely. Renderer draws on first activation.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="architecture" style="margin-top: 40px;">
+  <h2>The suppress_device_scale_factor_change_ Guard</h2>
+  <div class="root-cause-box">
+    <p><strong>Problem:</strong> <code data-src="ui/aura/window_tree_host.cc:626">RefreshScaleAndBounds</code> updates the compositor scale, which triggers a Layer cascade: <code data-src="ui/compositor/compositor.cc:545">Compositor::SetScaleAndSize</code> &rarr; <code data-src="ui/compositor/layer.cc:1433">Layer::OnDeviceScaleFactorChanged</code> &rarr; cascades to all child layers &rarr; reaches RWHVA &rarr; <code data-src="content/browser/renderer_host/render_widget_host_impl.cc:1307">SynchronizeVisualProperties</code>.</p>
+    <p>But at this point, only the <strong>root</strong> window's DIP bounds were updated. The RWHVA's child window still has <strong>stale</strong> DIP bounds. The premature sync sends <code>stale_DIP &times; new_scale</code> = wrong size.</p>
+    <p><strong>Solution:</strong> A <code>base::AutoReset&lt;bool&gt;</code> <code data-src="content/browser/renderer_host/render_widget_host_view_aura.h:870">suppress_device_scale_factor_change_</code> flag suppresses <code data-src="content/browser/renderer_host/render_widget_host_view_aura.cc:2364">OnDeviceScaleFactorChanged</code> during <code>RefreshScaleAndBounds</code>. The correct sync happens right after, from <code data-src="content/browser/renderer_host/render_widget_host_view_aura.cc:3577">ProcessDisplayMetricsChanged</code>, when bounds have propagated.</p>
+  </div>
+</div>
+
+<div class="file-refs">
+  <h2>Changed Files</h2>
+  <div class="file-refs-grid">
+    <div class="file-ref-card">
+      <div class="file-name"><a href="https://github.com/duckduckgo/ddg-cef-build-automation/blob/47308d56630/content/browser/renderer_host/render_widget_host_view_aura.cc" target="_blank">render_widget_host_view_aura.cc</a></div>
+      <ul>
+        <li><a href="https://github.com/duckduckgo/ddg-cef-build-automation/blob/47308d56630/content/browser/renderer_host/render_widget_host_view_aura.cc#L1054" target="_blank">:1054</a> ShowWithVisibility &mdash; detect &amp; fix stale host scale</li>
+        <li><a href="https://github.com/duckduckgo/ddg-cef-build-automation/blob/47308d56630/content/browser/renderer_host/render_widget_host_view_aura.cc#L2289" target="_blank">:2289</a> OnDisplayMetricsChanged &mdash; replace deferral with immediate fix</li>
+        <li><a href="https://github.com/duckduckgo/ddg-cef-build-automation/blob/47308d56630/content/browser/renderer_host/render_widget_host_view_aura.cc#L2370" target="_blank">:2370</a> OnDeviceScaleFactorChanged &mdash; suppress guard</li>
+      </ul>
+    </div>
+    <div class="file-ref-card">
+      <div class="file-name"><a href="https://github.com/duckduckgo/ddg-cef-build-automation/blob/47308d56630/content/browser/renderer_host/render_widget_host_view_aura.h" target="_blank">render_widget_host_view_aura.h</a></div>
+      <ul>
+        <li><a href="https://github.com/duckduckgo/ddg-cef-build-automation/blob/47308d56630/content/browser/renderer_host/render_widget_host_view_aura.h#L867" target="_blank">:867</a> suppress_device_scale_factor_change_ field</li>
+      </ul>
+    </div>
+    <div class="file-ref-card">
+      <div class="file-name"><a href="https://github.com/duckduckgo/ddg-cef-build-automation/blob/47308d56630/ui/aura/window_tree_host.cc" target="_blank">window_tree_host.cc</a></div>
+      <ul>
+        <li><a href="https://github.com/duckduckgo/ddg-cef-build-automation/blob/47308d56630/ui/aura/window_tree_host.cc#L626" target="_blank">:626</a> RefreshScaleAndBounds(float) implementation</li>
+      </ul>
+    </div>
+    <div class="file-ref-card">
+      <div class="file-name"><a href="https://github.com/duckduckgo/ddg-cef-build-automation/blob/47308d56630/ui/aura/window_tree_host.h" target="_blank">window_tree_host.h</a></div>
+      <ul>
+        <li><a href="https://github.com/duckduckgo/ddg-cef-build-automation/blob/47308d56630/ui/aura/window_tree_host.h#L251" target="_blank">:251</a> RefreshScaleAndBounds(float) declaration</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  DDG CEF WebView &mdash; Cross-DPI Display Transition Fix &mdash; <a href="https://github.com/duckduckgo/ddg-cef-build-automation/commit/47308d56630" target="_blank" style="color:#58a6ff">47308d56630</a>
+</div>
+
+<script>
+const REPO = 'https://github.com/duckduckgo/ddg-cef-build-automation';
+const COMMIT = '47308d56630';
+function src(path, line) {
+  const url = `${REPO}/blob/${COMMIT}/${path}#L${line}`;
+  return `<a class="coderef" href="${url}" target="_blank" title="${path}:${line}">`;
+}
+// Hydrate code refs marked with data-src attributes
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('[data-src]').forEach(el => {
+    const [path, line] = el.dataset.src.split(':');
+    const a = document.createElement('a');
+    a.className = 'coderef';
+    a.href = `${REPO}/blob/${COMMIT}/${path}#L${line}`;
+    a.target = '_blank';
+    a.title = `${path}:${line}`;
+    a.innerHTML = el.innerHTML;
+    el.innerHTML = '';
+    el.appendChild(a);
+  });
+});
+
+function showScenario(id) {
+  document.querySelectorAll('.scenario-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.scenario-tab').forEach(el => {
+    el.classList.remove('active', 'active-bug', 'active-fix');
+  });
+  document.getElementById('scenario-' + id).classList.add('active');
+  const tabs = document.querySelectorAll('.scenario-tab');
+  tabs.forEach(tab => {
+    if (tab.textContent.toLowerCase().includes(id.substring(0, 4))) {
+      tab.classList.add('active');
+      tab.classList.add('active-bug');
+    }
+  });
+}
+</script>
+</body>
+</html>
