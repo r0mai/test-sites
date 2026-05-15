@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>beforeunload repro</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2em; max-width: 40em; }
+  button { padding: .5em 1em; margin-right: .5em; }
+  pre { background: #eee; padding: .5em; }
+</style>
+</head>
+<body>
+<h1>beforeunload dialog repro</h1>
+
+<p>Status: <output id="status">handler not armed</output></p>
+
+<button id="arm">Arm beforeunload</button>
+<button id="disarm">Disarm</button>
+<button id="navigate">Navigate away (about:blank)</button>
+<button id="reload">Reload</button>
+
+<p>
+  To trigger the dialog, click <em>Arm beforeunload</em>, then either:
+</p>
+<ul>
+  <li>click <em>Navigate away</em> or <em>Reload</em>, or</li>
+  <li>close the CoreCefView / parent window — this is the path that races
+      with browser teardown and reproduces the crash.</li>
+</ul>
+
+<p>
+  Modern browsers require a <strong>user gesture</strong> on the page before
+  beforeunload will actually prompt. Click anywhere on the page once after
+  arming, otherwise the prompt is suppressed silently.
+</p>
+
+<pre id="log"></pre>
+
+<script>
+  const statusEl = document.getElementById('status');
+  const logEl = document.getElementById('log');
+  function log(msg) {
+    const t = new Date().toISOString().slice(11, 23);
+    logEl.textContent += `[${t}] ${msg}\n`;
+  }
+
+  function handler(e) {
+    log('beforeunload fired');
+    e.preventDefault();
+    e.returnValue = '';
+    return '';
+  }
+
+  document.getElementById('arm').addEventListener('click', () => {
+    window.addEventListener('beforeunload', handler);
+    statusEl.textContent = 'armed';
+    log('handler armed');
+  });
+
+  document.getElementById('disarm').addEventListener('click', () => {
+    window.removeEventListener('beforeunload', handler);
+    statusEl.textContent = 'disarmed';
+    log('handler removed');
+  });
+
+  document.getElementById('navigate').addEventListener('click', () => {
+    log('navigating to about:blank');
+    location.href = 'about:blank';
+  });
+
+  document.getElementById('reload').addEventListener('click', () => {
+    log('reloading');
+    location.reload();
+  });
+</script>
+</body>
+</html>
